@@ -5,9 +5,14 @@ import {
   deleteMonitor,
   getMonitor,
   listMonitors,
+  listRunnableMonitors,
+  pauseMonitor,
+  recordCheck,
+  resumeMonitor,
   updateMonitor,
 } from "./monitoring";
 
+const FIVE = 5 * 60 * 1000;
 const ORIGIN = Date.UTC(2026, 0, 1, 0, 0, 0);
 
 describe("createMonitor", () => {
@@ -22,6 +27,7 @@ describe("createMonitor", () => {
     expect(result.monitor.name).toBe("Docs");
     expect(result.monitor.url).toBe("https://example.com/health");
     expect(result.monitor.public).toBe(true);
+    expect(result.monitor.state).toBe("Up");
     expect(listMonitors(db)).toHaveLength(1);
   });
 
@@ -138,5 +144,157 @@ describe("deleteMonitor", () => {
     deleteMonitor(db, created.monitor.id);
     expect(listMonitors(db)).toHaveLength(0);
     expect(() => getMonitor(db, created.monitor.id)).toThrow("not_found");
+  });
+});
+
+describe("recordCheck and Incidents", () => {
+  it("opens an Incident after three consecutive Failed Checks", () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      t,
+    ).monitor.id;
+
+    t += FIVE;
+    let r = recordCheck(db, id, { at: t, error: "timeout" });
+    expect(r.monitor.state).toBe("Up");
+    expect(r.intents).toHaveLength(0);
+
+    t += FIVE;
+    r = recordCheck(db, id, { at: t, error: "timeout" });
+    expect(r.monitor.state).toBe("Up");
+
+    t += FIVE;
+    r = recordCheck(db, id, { at: t, error: "timeout" });
+    expect(r.monitor.state).toBe("Down");
+    expect(r.intents[0]?.kind).toBe("incident_opened");
+  });
+
+  it("resets consecutive fails after a Successful Check", () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      t,
+    ).monitor.id;
+
+    for (const payload of [
+      { error: "timeout" },
+      { error: "timeout" },
+      { statusCode: 200, responseMs: 10 },
+      { error: "timeout" },
+      { error: "timeout" },
+    ] as const) {
+      t += FIVE;
+      const r = recordCheck(db, id, { at: t, ...payload });
+      expect(r.monitor.state).toBe("Up");
+      expect(r.intents).toHaveLength(0);
+    }
+  });
+
+  it("closes an Incident after three consecutive Successful Checks", () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      t,
+    ).monitor.id;
+
+    for (let i = 0; i < 3; i += 1) {
+      t += FIVE;
+      recordCheck(db, id, { at: t, error: "timeout" });
+    }
+
+    t += FIVE;
+    let r = recordCheck(db, id, { at: t, statusCode: 200, responseMs: 1 });
+    expect(r.monitor.state).toBe("Down");
+
+    t += FIVE;
+    r = recordCheck(db, id, { at: t, statusCode: 200, responseMs: 1 });
+    expect(r.monitor.state).toBe("Down");
+
+    t += FIVE;
+    r = recordCheck(db, id, { at: t, statusCode: 200, responseMs: 1 });
+    expect(r.monitor.state).toBe("Up");
+    expect(r.intents[0]?.kind).toBe("incident_closed");
+    expect(r.intents[0]).toMatchObject({ reason: "recovered" });
+  });
+
+  it("treats 301 as Successful Check and 500 as Failed Check", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+
+    const ok = recordCheck(db, id, {
+      at: ORIGIN + FIVE,
+      statusCode: 301,
+      responseMs: 5,
+    });
+    expect(ok.check.success).toBe(true);
+
+    const bad = recordCheck(db, id, {
+      at: ORIGIN + 2 * FIVE,
+      statusCode: 500,
+      responseMs: 5,
+    });
+    expect(bad.check.success).toBe(false);
+  });
+});
+
+describe("pauseMonitor and resumeMonitor", () => {
+  it("closes an open Incident on Pause and rejects later Checks", () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      t,
+    ).monitor.id;
+
+    for (let i = 0; i < 3; i += 1) {
+      t += FIVE;
+      recordCheck(db, id, { at: t, error: "timeout" });
+    }
+
+    const paused = pauseMonitor(db, id, t);
+    expect(paused.monitor.state).toBe("Paused");
+    expect(paused.intents[0]).toMatchObject({ reason: "paused" });
+    expect(() =>
+      recordCheck(db, id, { at: t + FIVE, error: "timeout" }),
+    ).toThrow("paused");
+    expect(listRunnableMonitors(db).map((m) => m.id)).not.toContain(id);
+  });
+
+  it("resumes as Up and only counts new Checks toward Incidents", () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      t,
+    ).monitor.id;
+
+    for (let i = 0; i < 3; i += 1) {
+      t += FIVE;
+      recordCheck(db, id, { at: t, error: "timeout" });
+    }
+    pauseMonitor(db, id, t);
+    t += FIVE;
+    const resumed = resumeMonitor(db, id, t);
+    expect(resumed.monitor.state).toBe("Up");
+
+    t += FIVE;
+    let r = recordCheck(db, id, { at: t, error: "timeout" });
+    expect(r.monitor.state).toBe("Up");
+    t += FIVE;
+    r = recordCheck(db, id, { at: t, error: "timeout" });
+    expect(r.monitor.state).toBe("Up");
   });
 });

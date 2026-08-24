@@ -7,6 +7,8 @@ import { getDb } from "@/lib/db";
 import {
   createMonitor,
   deleteMonitor,
+  pauseMonitor,
+  resumeMonitor,
   updateMonitor,
 } from "@/lib/monitoring/monitoring";
 
@@ -86,5 +88,19 @@ export async function deleteMonitorAction(formData: FormData) {
     }
     throw error;
   }
+  revalidatePath("/console");
+}
+
+export async function pauseMonitorAction(formData: FormData) {
+  if (!(await requireOperator())) redirect("/login");
+  const id = String(formData.get("id") ?? "");
+  pauseMonitor(getDb(), id, Date.now());
+  revalidatePath("/console");
+}
+
+export async function resumeMonitorAction(formData: FormData) {
+  if (!(await requireOperator())) redirect("/login");
+  const id = String(formData.get("id") ?? "");
+  resumeMonitor(getDb(), id, Date.now());
   revalidatePath("/console");
 }

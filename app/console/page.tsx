@@ -2,13 +2,32 @@ import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions";
 import { LanguageSwitcher } from "@/app/components/language-switcher";
 import { CreateMonitorForm } from "@/app/components/monitor-form";
-import { deleteMonitorAction } from "@/app/monitor-actions";
+import {
+  deleteMonitorAction,
+  pauseMonitorAction,
+  resumeMonitorAction,
+} from "@/app/monitor-actions";
 import { getCurrentOperator } from "@/lib/auth/current";
 import { getDb } from "@/lib/db";
 import { formatUtc } from "@/lib/i18n/messages";
 import { getDictionary } from "@/lib/i18n/server";
-import { listMonitors } from "@/lib/monitoring/monitoring";
+import { listMonitors, type MonitorState } from "@/lib/monitoring/monitoring";
 import Link from "next/link";
+
+function stateLabel(
+  state: MonitorState,
+  t: { stateUp: string; stateDown: string; statePaused: string },
+) {
+  if (state === "Up") return t.stateUp;
+  if (state === "Down") return t.stateDown;
+  return t.statePaused;
+}
+
+function stateClass(state: MonitorState) {
+  if (state === "Up") return "bg-emerald-50 text-emerald-800";
+  if (state === "Down") return "bg-red-50 text-red-800";
+  return "bg-amber-50 text-amber-900";
+}
 
 export default async function ConsolePage() {
   const operator = await getCurrentOperator();
@@ -85,13 +104,41 @@ export default async function ConsolePage() {
                 className="flex flex-wrap items-start justify-between gap-4 px-5 py-4"
               >
                 <div className="min-w-0">
-                  <p className="font-medium">{monitor.name}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{monitor.name}</p>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${stateClass(monitor.state)}`}
+                    >
+                      {stateLabel(monitor.state, t)}
+                    </span>
+                  </div>
                   <p className="truncate text-sm text-zinc-600">{monitor.url}</p>
                   <p className="mt-1 text-xs uppercase tracking-wide text-zinc-500">
                     {monitor.public ? t.monitorPublicYes : t.monitorPublicNo}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {monitor.paused ? (
+                    <form action={resumeMonitorAction}>
+                      <input type="hidden" name="id" value={monitor.id} />
+                      <button
+                        type="submit"
+                        className="rounded border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50"
+                      >
+                        {t.resumeMonitor}
+                      </button>
+                    </form>
+                  ) : (
+                    <form action={pauseMonitorAction}>
+                      <input type="hidden" name="id" value={monitor.id} />
+                      <button
+                        type="submit"
+                        className="rounded border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50"
+                      >
+                        {t.pauseMonitor}
+                      </button>
+                    </form>
+                  )}
                   <Link
                     href={`/console/${monitor.id}/edit`}
                     className="rounded border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50"
