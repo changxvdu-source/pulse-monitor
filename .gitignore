@@ -1,0 +1,36 @@
+# Local clone of mattpocock/skills (source of .cursor/skills, not part of this project)
+/skills/
+
+# Local scratch issue tracker (solo workflow, not published)
+# Remove this line if you want specs/issues in the open-source repo
+.scratch/
+
+# dependencies
+/node_modules
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# env files
+.env
+.env.*
+!.env.example
+
+# sqlite databases
+/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# misc
+.DS_Store
+*.pem
+*.log
+*.tsbuildinfo
+next-env.d.ts
+.vercel
