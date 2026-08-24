@@ -3,8 +3,10 @@ import { performHttpCheck } from "@/lib/monitoring/http-check";
 import {
   listRunnableMonitors,
   recordCheck,
+  rotateChecks,
   type NotificationIntent,
 } from "@/lib/monitoring/monitoring";
+import { sendIntents } from "@/lib/notify/send";
 
 export const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -27,10 +29,14 @@ export async function runCheckCycle(options?: {
     });
     if (recorded.intents.length > 0) {
       options?.onIntents?.(recorded.intents);
+      if (!options?.onIntents) {
+        await sendIntents(db, recorded.intents);
+      }
     }
     checked += 1;
   }
 
+  rotateChecks(db, now);
   return checked;
 }
 
@@ -39,13 +45,7 @@ export function startWorkerLoop() {
 
   const tick = async () => {
     try {
-      const count = await runCheckCycle({
-        onIntents: (intents) => {
-          for (const intent of intents) {
-            console.log("[pulse-worker] notification intent", intent);
-          }
-        },
-      });
+      const count = await runCheckCycle();
       console.log(`[pulse-worker] checked ${count} monitor(s)`);
     } catch (error) {
       console.error("[pulse-worker] cycle failed", error);

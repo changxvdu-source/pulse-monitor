@@ -3,6 +3,11 @@ import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { AppDatabase } from "@/lib/db/client";
 import { operators, type OperatorRow } from "@/lib/db/schema";
+import {
+  DEFAULT_LOCALE,
+  isLocale,
+  type Locale,
+} from "@/lib/i18n/messages";
 
 export type Operator = {
   id: string;
@@ -25,6 +30,7 @@ export async function ensureOperator(
       id,
       email: input.email,
       passwordHash,
+      locale: DEFAULT_LOCALE,
       createdAt: new Date(),
     })
     .run();
@@ -57,4 +63,18 @@ export function listOperators(db: AppDatabase): Operator[] {
     .select({ id: operators.id, email: operators.email })
     .from(operators)
     .all();
+}
+
+export function getOperatorLocale(db: AppDatabase): Locale {
+  const row = db.select({ locale: operators.locale }).from(operators).get();
+  return isLocale(row?.locale) ? row.locale : DEFAULT_LOCALE;
+}
+
+export function setOperatorLocale(db: AppDatabase, locale: Locale): void {
+  const row = db.select({ id: operators.id }).from(operators).get();
+  if (!row) return;
+  db.update(operators)
+    .set({ locale })
+    .where(eq(operators.id, row.id))
+    .run();
 }

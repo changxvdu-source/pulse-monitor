@@ -4,6 +4,7 @@ import { SignInForm } from "@/app/components/sign-in-form";
 import { getCurrentOperator } from "@/lib/auth/current";
 import { getDictionary } from "@/lib/i18n/server";
 import { formatUtc } from "@/lib/i18n/messages";
+import Link from "next/link";
 
 export default async function LoginPage() {
   const operator = await getCurrentOperator();
@@ -41,6 +42,12 @@ export default async function LoginPage() {
       <p className="text-sm text-zinc-500">
         {t.now}: {now}
       </p>
+      <Link
+        href="/"
+        className="text-sm text-zinc-600 underline underline-offset-4 hover:text-zinc-900"
+      >
+        {t.backToStatus}
+      </Link>
     </main>
   );
 }

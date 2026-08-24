@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { authenticate } from "@/lib/auth/operator";
+import { authenticate, setOperatorLocale } from "@/lib/auth/operator";
 import { bootstrapOperator } from "@/lib/auth/bootstrap";
-import { SESSION_COOKIE } from "@/lib/auth/current";
+import { getCurrentOperator, SESSION_COOKIE } from "@/lib/auth/current";
 import { requireAuthEnv } from "@/lib/auth/env";
 import { createSessionToken } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
@@ -60,5 +60,9 @@ export async function setLocale(locale: Locale) {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
   });
+  const operator = await getCurrentOperator();
+  if (operator) {
+    setOperatorLocale(getDb(), locale);
+  }
   revalidatePath("/", "layout");
 }

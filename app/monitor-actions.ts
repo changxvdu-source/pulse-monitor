@@ -11,6 +11,7 @@ import {
   resumeMonitor,
   updateMonitor,
 } from "@/lib/monitoring/monitoring";
+import { sendIntents } from "@/lib/notify/send";
 
 export type MonitorFormState = {
   error?: "name_required" | "invalid_url" | "url_not_unique" | "not_found" | "unauthorized";
@@ -56,6 +57,7 @@ export async function createMonitorAction(
   }
 
   revalidatePath("/console");
+  revalidatePath("/");
   redirect("/console");
 }
 
@@ -73,6 +75,7 @@ export async function updateMonitorAction(
   }
 
   revalidatePath("/console");
+  revalidatePath("/");
   redirect("/console");
 }
 
@@ -84,18 +87,23 @@ export async function deleteMonitorAction(formData: FormData) {
   } catch (error) {
     if (error instanceof Error && error.message === "not_found") {
       revalidatePath("/console");
+      revalidatePath("/");
       return;
     }
     throw error;
   }
   revalidatePath("/console");
+  revalidatePath("/");
 }
 
 export async function pauseMonitorAction(formData: FormData) {
   if (!(await requireOperator())) redirect("/login");
   const id = String(formData.get("id") ?? "");
-  pauseMonitor(getDb(), id, Date.now());
+  const db = getDb();
+  const paused = pauseMonitor(db, id, Date.now());
+  await sendIntents(db, paused.intents);
   revalidatePath("/console");
+  revalidatePath("/");
 }
 
 export async function resumeMonitorAction(formData: FormData) {
@@ -103,4 +111,5 @@ export async function resumeMonitorAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   resumeMonitor(getDb(), id, Date.now());
   revalidatePath("/console");
+  revalidatePath("/");
 }

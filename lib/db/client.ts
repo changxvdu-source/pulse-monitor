@@ -19,6 +19,7 @@ function migrate(sqlite: Database.Database) {
       id TEXT PRIMARY KEY NOT NULL,
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
+      locale TEXT NOT NULL DEFAULT 'en',
       created_at INTEGER NOT NULL
     );
 
@@ -51,11 +52,34 @@ function migrate(sqlite: Database.Database) {
       closed_at INTEGER,
       close_reason TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS state_segments (
+      id TEXT PRIMARY KEY NOT NULL,
+      monitor_id TEXT NOT NULL,
+      state TEXT NOT NULL,
+      started_at INTEGER NOT NULL,
+      ended_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS hourly_summaries (
+      id TEXT PRIMARY KEY NOT NULL,
+      monitor_id TEXT NOT NULL,
+      hour_start INTEGER NOT NULL,
+      successful INTEGER NOT NULL,
+      failed INTEGER NOT NULL,
+      average_response_ms INTEGER
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS hourly_summaries_monitor_hour
+      ON hourly_summaries (monitor_id, hour_start);
+
+    CREATE INDEX IF NOT EXISTS checks_at ON checks (at);
   `);
 
   ensureColumn(sqlite, "monitors", "consecutive_fails", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(sqlite, "monitors", "consecutive_successes", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(sqlite, "monitors", "open_incident_id", "TEXT");
+  ensureColumn(sqlite, "operators", "locale", "TEXT NOT NULL DEFAULT 'en'");
 }
 
 function ensureColumn(

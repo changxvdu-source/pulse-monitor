@@ -79,6 +79,12 @@ export default async function ConsolePage() {
               {t.signOut}
             </button>
           </form>
+          <Link
+            href="/"
+            className="text-sm text-zinc-600 underline underline-offset-4 hover:text-zinc-900"
+          >
+            {t.viewStatusPage}
+          </Link>
         </div>
       </header>
 

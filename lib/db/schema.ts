@@ -4,6 +4,7 @@ export const operators = sqliteTable("operators", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
+  locale: text("locale").notNull().default("en"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
@@ -35,6 +36,23 @@ export const incidents = sqliteTable("incidents", {
   openedAt: integer("opened_at", { mode: "timestamp_ms" }).notNull(),
   closedAt: integer("closed_at", { mode: "timestamp_ms" }),
   closeReason: text("close_reason"),
+});
+
+export const stateSegments = sqliteTable("state_segments", {
+  id: text("id").primaryKey(),
+  monitorId: text("monitor_id").notNull(),
+  state: text("state").notNull(),
+  startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+  endedAt: integer("ended_at", { mode: "timestamp_ms" }),
+});
+
+export const hourlySummaries = sqliteTable("hourly_summaries", {
+  id: text("id").primaryKey(),
+  monitorId: text("monitor_id").notNull(),
+  hourStart: integer("hour_start", { mode: "timestamp_ms" }).notNull(),
+  successful: integer("successful").notNull(),
+  failed: integer("failed").notNull(),
+  averageResponseMs: integer("average_response_ms"),
 });
 
 export type OperatorRow = typeof operators.$inferSelect;

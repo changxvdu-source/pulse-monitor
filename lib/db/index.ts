@@ -7,10 +7,11 @@ const globalForDb = globalThis as unknown as {
 };
 
 function databasePath(): string {
-  if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH;
-  const dir = path.join(process.cwd(), "data");
-  fs.mkdirSync(dir, { recursive: true });
-  return path.join(dir, "pulse.db");
+  const filePath = process.env.DATABASE_PATH
+    ? process.env.DATABASE_PATH
+    : path.join(process.cwd(), "data", "pulse.db");
+  fs.mkdirSync(path.dirname(path.resolve(filePath)), { recursive: true });
+  return filePath;
 }
 
 export function getDb(): AppDatabase {

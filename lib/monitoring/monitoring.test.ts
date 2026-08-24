@@ -4,11 +4,14 @@ import {
   createMonitor,
   deleteMonitor,
   getMonitor,
+  getStatusPage,
   listMonitors,
+  listPublicMonitors,
   listRunnableMonitors,
   pauseMonitor,
   recordCheck,
   resumeMonitor,
+  rotateChecks,
   updateMonitor,
 } from "./monitoring";
 
@@ -296,5 +299,85 @@ describe("pauseMonitor and resumeMonitor", () => {
     t += FIVE;
     r = recordCheck(db, id, { at: t, error: "timeout" });
     expect(r.monitor.state).toBe("Up");
+  });
+});
+
+describe("listPublicMonitors", () => {
+  it("hides private Monitors and uses the name as title", () => {
+    const db = createTestDb();
+    createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    );
+    createMonitor(
+      db,
+      { name: "Internal", url: "http://127.0.0.1:3000/health", public: false },
+      ORIGIN,
+    );
+    const pub = listPublicMonitors(db);
+    expect(pub).toHaveLength(1);
+    expect(pub[0]?.name).toBe("Docs");
+  });
+});
+
+describe("Availability and rotation", () => {
+  it("excludes Paused time from 90-day Availability", () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      t,
+    ).monitor.id;
+    for (let i = 0; i < 3; i += 1) {
+      t += FIVE;
+      recordCheck(db, id, { at: t, error: "timeout" });
+    }
+    pauseMonitor(db, id, ORIGIN + 60 * 60 * 1000);
+    const resumeAt = ORIGIN + 2 * 60 * 60 * 1000;
+    resumeMonitor(db, id, resumeAt);
+
+    const view = getStatusPage(db, resumeAt)[0];
+    const expected = (15 * 60 * 1000) / ((15 + 45) * 60 * 1000);
+    expect(view?.availability90d).toBeCloseTo(expected, 9);
+  });
+
+  it("turns Checks older than thirty days into Hourly Summaries", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+    recordCheck(db, id, {
+      at: ORIGIN + FIVE,
+      statusCode: 200,
+      responseMs: 100,
+    });
+    const later = ORIGIN + 31 * 24 * 60 * 60 * 1000;
+    rotateChecks(db, later);
+    const view = getStatusPage(db, later)[0];
+    expect(view?.series).toEqual([
+      expect.objectContaining({ responseMs: 100 }),
+    ]);
+  });
+
+  it("does not rewrite Checks after Pause and Resume", () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      t,
+    ).monitor.id;
+    t += FIVE;
+    recordCheck(db, id, { at: t, statusCode: 200, responseMs: 42 });
+    pauseMonitor(db, id, t + FIVE);
+    resumeMonitor(db, id, t + 2 * FIVE);
+    const view = getStatusPage(db, t + 2 * FIVE)[0];
+    expect(view?.series).toEqual(
+      expect.arrayContaining([expect.objectContaining({ responseMs: 42 })]),
+    );
   });
 });
