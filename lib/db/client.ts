@@ -22,4 +22,14 @@ function migrate(db: AppDatabase) {
       created_at INTEGER NOT NULL
     )
   `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS monitors (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      url TEXT NOT NULL UNIQUE,
+      public INTEGER NOT NULL DEFAULT 0,
+      paused INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    )
+  `);
 }
