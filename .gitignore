@@ -27,6 +27,9 @@
 *.db-wal
 *.db-shm
 
+# bundled worker (built in CI / Docker)
+/dist/
+
 # misc
 .DS_Store
 *.pem

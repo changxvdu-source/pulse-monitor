@@ -1,0 +1,52 @@
+services:
+  web:
+    image: ${PULSE_IMAGE}
+    env_file: ./app.env
+    environment:
+      NODE_ENV: production
+      DATABASE_PATH: /data/pulse.db
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      NODE_OPTIONS: --max-old-space-size=192
+    volumes:
+      - pulse-data:/data
+    restart: unless-stopped
+    expose:
+      - "3000"
+    command: ["node", "server.js"]
+
+  worker:
+    image: ${PULSE_IMAGE}
+    env_file: ./app.env
+    environment:
+      NODE_ENV: production
+      DATABASE_PATH: /data/pulse.db
+      NODE_OPTIONS: --max-old-space-size=128
+    volumes:
+      - pulse-data:/data
+    restart: unless-stopped
+    command: ["node", "worker.cjs"]
+    depends_on:
+      - web
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      PULSE_DOMAIN: ${PULSE_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  pulse-data:
+  caddy-data:
+  caddy-config:
