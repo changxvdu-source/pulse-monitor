@@ -1,4 +1,5 @@
 import { ResponseChart } from "@/app/components/response-chart";
+import { NowVsTypical } from "@/app/components/monitor-compare-table";
 import {
   availabilityLabel,
   stateBadgeClass,
@@ -6,7 +7,13 @@ import {
   stateLabel,
 } from "@/app/components/status-styles";
 import { UptimeCalendar } from "@/app/components/uptime-calendar";
-import { formatUtc, type Locale, getMessages } from "@/lib/i18n/messages";
+import {
+  formatLastCheckLine,
+  formatUpSince,
+  formatUtc,
+  type Locale,
+  getMessages,
+} from "@/lib/i18n/messages";
 import type { StatusIncident, StatusMonitorView } from "@/lib/monitoring/monitoring";
 
 type Messages = ReturnType<typeof getMessages>;
@@ -19,17 +26,26 @@ function incidentStatus(incident: StatusIncident, t: Messages) {
 
 export function MonitorStatusCard(props: {
   view: StatusMonitorView;
+  now: number;
   locale: Locale;
   t: Messages;
   heading?: "h1" | "h2";
   showUrl?: boolean;
   hideIdentity?: boolean;
+  embedded?: boolean;
 }) {
-  const { view, locale, t } = props;
+  const { view, now, locale, t } = props;
   const Heading = props.heading ?? "h2";
 
   return (
-    <article className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+    <article
+      id={`monitor-${view.id}`}
+      className={
+        props.embedded
+          ? ""
+          : "overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
+      }
+    >
       <div className={`h-1.5 w-full ${stateBarClass(view.state)}`} />
       <div className="flex flex-col gap-6 px-6 py-6">
         {props.hideIdentity ? (
@@ -58,12 +74,48 @@ export function MonitorStatusCard(props: {
           </header>
         )}
 
-        <p className="text-sm text-zinc-600">
-          {t.availability90d}
-          <span className="ml-2 text-3xl font-semibold tracking-tight text-zinc-900">
-            {availabilityLabel(view.availability90d)}
-          </span>
-        </p>
+        <section>
+          <h3 className="text-sm font-medium text-zinc-600">{t.lastCheck}</h3>
+          {view.lastCheck ? (
+            <p className="mt-1 text-xl font-semibold tracking-tight text-zinc-900">
+              {formatLastCheckLine(view.lastCheck, now, locale)}
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-zinc-500">{t.noLastCheck}</p>
+          )}
+          {view.slowerThanUsual ? (
+            <p className="mt-1 text-sm font-medium text-amber-800">
+              {t.slowerThanUsual}
+            </p>
+          ) : null}
+        </section>
+
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt className="text-sm text-zinc-600">{t.upSince}</dt>
+            <dd className="mt-1 text-lg font-medium tabular-nums text-zinc-900">
+              {formatUpSince(view.upSince, now, locale) ?? "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm text-zinc-600">{t.nowVsTypical}</dt>
+            <dd className="mt-1">
+              <NowVsTypical view={view} t={t} />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm text-zinc-600">{t.isolatedFails7d}</dt>
+            <dd className="mt-1 text-lg font-medium tabular-nums text-zinc-900">
+              {view.isolatedFailedChecks7d}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-sm text-zinc-600">{t.availability90d}</dt>
+            <dd className="mt-1 text-lg font-medium tabular-nums text-zinc-900">
+              {availabilityLabel(view.availability90d)}
+            </dd>
+          </div>
+        </dl>
 
         <section>
           <h3 className="text-sm font-medium text-zinc-600">{t.calendarTitle}</h3>
@@ -77,6 +129,8 @@ export function MonitorStatusCard(props: {
           <div className="mt-2">
             <ResponseChart
               series={view.series}
+              typicalMs={view.typicalResponseMs}
+              typicalLabel={t.typicalResponse}
               label={t.responseTime}
               emptyLabel={t.noResponseSamples}
               lastLabel={t.lastResponseMs}

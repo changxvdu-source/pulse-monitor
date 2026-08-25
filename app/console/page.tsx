@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions";
 import { CreateMonitorForm } from "@/app/components/monitor-form";
+import { NowVsTypical } from "@/app/components/monitor-compare-table";
 import { PageShell } from "@/app/components/page-shell";
 import {
   availabilityLabel,
@@ -10,7 +11,7 @@ import {
 } from "@/app/components/status-styles";
 import { getCurrentOperator } from "@/lib/auth/current";
 import { getDb } from "@/lib/db";
-import { formatUtc } from "@/lib/i18n/messages";
+import { formatLastCheckLine, formatUpSince, formatUtc } from "@/lib/i18n/messages";
 import { getDictionary } from "@/lib/i18n/server";
 import { listMonitorStatusViews } from "@/lib/monitoring/monitoring";
 import Link from "next/link";
@@ -21,8 +22,9 @@ export default async function ConsolePage() {
 
   const { locale, t } = await getDictionary();
   const at = new Date();
+  const nowMs = at.getTime();
   const now = formatUtc(at, locale);
-  const monitors = listMonitorStatusViews(getDb(), at.getTime());
+  const monitors = listMonitorStatusViews(getDb(), nowMs);
 
   const formLabels = {
     name: t.monitorName,
@@ -103,7 +105,24 @@ export default async function ConsolePage() {
                       </span>
                     </div>
                     <p className="truncate text-sm text-zinc-600">{monitor.url}</p>
+                    <p className="mt-1 text-sm text-zinc-600">
+                      {monitor.lastCheck
+                        ? formatLastCheckLine(monitor.lastCheck, nowMs, locale)
+                        : t.noLastCheck}
+                    </p>
                     <p className="mt-1 text-sm text-zinc-500">
+                      {t.upSince}{" "}
+                      <span className="font-medium text-zinc-800">
+                        {formatUpSince(monitor.upSince, nowMs, locale) ?? "—"}
+                      </span>
+                      <span className="mx-2 text-zinc-300">·</span>
+                      <NowVsTypical view={monitor} t={t} />
+                      <span className="mx-2 text-zinc-300">·</span>
+                      {t.isolatedFailsShort}{" "}
+                      <span className="font-medium text-zinc-800">
+                        {monitor.isolatedFailedChecks7d}
+                      </span>
+                      <span className="mx-2 text-zinc-300">·</span>
                       {t.availability90d}{" "}
                       <span className="font-medium text-zinc-800">
                         {availabilityLabel(monitor.availability90d)}

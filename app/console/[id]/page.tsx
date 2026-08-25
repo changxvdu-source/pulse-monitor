@@ -92,7 +92,13 @@ export default async function MonitorDetailPage({
         </form>
       </div>
 
-      <MonitorStatusCard view={view} locale={locale} t={t} hideIdentity />
+      <MonitorStatusCard
+        view={view}
+        now={at.getTime()}
+        locale={locale}
+        t={t}
+        hideIdentity
+      />
 
       <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
         <h2 className="border-b border-zinc-100 px-6 py-4 text-lg font-medium">

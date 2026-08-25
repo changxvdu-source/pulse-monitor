@@ -1,13 +1,22 @@
-import type { getMessages } from "@/lib/i18n/messages";
-import type { OverallStatus } from "@/lib/monitoring/monitoring";
+import {
+  formatHighlight,
+  type Locale,
+  getMessages,
+} from "@/lib/i18n/messages";
+import type {
+  OverallStatus,
+  StatusHighlight,
+} from "@/lib/monitoring/monitoring";
 
 type Messages = ReturnType<typeof getMessages>;
 
 export function OverallBanner(props: {
   status: OverallStatus;
+  highlight: StatusHighlight;
+  locale: Locale;
   t: Messages;
 }) {
-  const { status, t } = props;
+  const { status, highlight, locale, t } = props;
 
   if (status === "empty") {
     return (
@@ -30,6 +39,7 @@ export function OverallBanner(props: {
       : status === "down"
         ? t.overallDown
         : t.overallPaused;
+  const detail = formatHighlight(highlight, locale);
 
   return (
     <div className={`rounded-xl px-6 py-8 shadow-sm ${tone}`}>
@@ -37,6 +47,9 @@ export function OverallBanner(props: {
         {t.statusTitle}
       </p>
       <p className="mt-2 text-2xl font-semibold">{label}</p>
+      {detail ? (
+        <p className="mt-3 text-sm text-white/90">{detail}</p>
+      ) : null}
     </div>
   );
 }

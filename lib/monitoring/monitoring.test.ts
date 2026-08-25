@@ -11,6 +11,7 @@ import {
   listPublicMonitors,
   listRecentChecks,
   listRunnableMonitors,
+  overallHighlight,
   overallStatus,
   pauseMonitor,
   recordCheck,
@@ -420,6 +421,325 @@ describe("overallStatus", () => {
       "paused",
     );
     expect(overallStatus([{ state: "Up" }, { state: "Paused" }])).toBe("up");
+  });
+});
+
+describe("Status Page evidence while Up", () => {
+  it("includes Up Since as the start of the current Up period", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+
+    const view = getMonitorStatusView(db, id, ORIGIN + FIVE);
+    expect(view.state).toBe("Up");
+    expect(view.upSince).toBe(ORIGIN);
+  });
+
+  it("does not change Up Since after Isolated Failed Checks", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+
+    recordCheck(db, id, { at: ORIGIN + FIVE, error: "timeout" });
+    recordCheck(db, id, { at: ORIGIN + 2 * FIVE, error: "timeout" });
+    recordCheck(db, id, { at: ORIGIN + 3 * FIVE, statusCode: 200, responseMs: 10 });
+
+    const view = getMonitorStatusView(db, id, ORIGIN + 3 * FIVE);
+    expect(view.state).toBe("Up");
+    expect(view.upSince).toBe(ORIGIN);
+  });
+
+  it("has no Up Since while Down", () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      t,
+    ).monitor.id;
+
+    for (let i = 0; i < 3; i += 1) {
+      t += FIVE;
+      recordCheck(db, id, { at: t, error: "timeout" });
+    }
+
+    const view = getMonitorStatusView(db, id, t);
+    expect(view.state).toBe("Down");
+    expect(view.upSince).toBeNull();
+  });
+
+  it("starts a new Up Since when an Incident recovers", () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      t,
+    ).monitor.id;
+
+    for (let i = 0; i < 3; i += 1) {
+      t += FIVE;
+      recordCheck(db, id, { at: t, error: "timeout" });
+    }
+    t += FIVE;
+    recordCheck(db, id, { at: t, statusCode: 200, responseMs: 1 });
+    t += FIVE;
+    recordCheck(db, id, { at: t, statusCode: 200, responseMs: 1 });
+    t += FIVE;
+    recordCheck(db, id, { at: t, statusCode: 200, responseMs: 1 });
+
+    const view = getMonitorStatusView(db, id, t);
+    expect(view.state).toBe("Up");
+    expect(view.upSince).toBe(t);
+  });
+
+  it("has no Up Since while Paused, then starts a new one on Resume", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+
+    const pauseAt = ORIGIN + FIVE;
+    pauseMonitor(db, id, pauseAt);
+    expect(getMonitorStatusView(db, id, pauseAt).upSince).toBeNull();
+
+    const resumeAt = ORIGIN + 2 * FIVE;
+    resumeMonitor(db, id, resumeAt);
+    const view = getMonitorStatusView(db, id, resumeAt);
+    expect(view.state).toBe("Up");
+    expect(view.upSince).toBe(resumeAt);
+  });
+
+  it("includes the Last Check on the Status view", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+
+    recordCheck(db, id, {
+      at: ORIGIN + FIVE,
+      statusCode: 200,
+      responseMs: 187,
+    });
+
+    const view = getMonitorStatusView(db, id, ORIGIN + FIVE);
+    expect(view.lastCheck).toEqual({
+      at: ORIGIN + FIVE,
+      success: true,
+      statusCode: 200,
+      responseMs: 187,
+      error: null,
+    });
+  });
+
+  it("uses the 7-day median of Successful Checks as typical response time", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+
+    recordCheck(db, id, { at: ORIGIN + FIVE, statusCode: 200, responseMs: 100 });
+    recordCheck(db, id, { at: ORIGIN + 2 * FIVE, statusCode: 200, responseMs: 180 });
+    recordCheck(db, id, { at: ORIGIN + 3 * FIVE, statusCode: 200, responseMs: 200 });
+
+    const view = getMonitorStatusView(db, id, ORIGIN + 3 * FIVE);
+    expect(view.typicalResponseMs).toBe(180);
+    expect(view.slowerThanUsual).toBe(false);
+  });
+
+  it("marks slowerThanUsual when the Last Check is well above typical", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+
+    recordCheck(db, id, { at: ORIGIN + FIVE, statusCode: 200, responseMs: 100 });
+    recordCheck(db, id, { at: ORIGIN + 2 * FIVE, statusCode: 200, responseMs: 100 });
+    recordCheck(db, id, { at: ORIGIN + 3 * FIVE, statusCode: 200, responseMs: 110 });
+    recordCheck(db, id, { at: ORIGIN + 4 * FIVE, statusCode: 200, responseMs: 400 });
+
+    const view = getMonitorStatusView(db, id, ORIGIN + 4 * FIVE);
+    expect(view.typicalResponseMs).toBe(105);
+    expect(view.lastCheck?.responseMs).toBe(400);
+    expect(view.slowerThanUsual).toBe(true);
+  });
+
+  it("counts Isolated Failed Checks that never opened an Incident", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+
+    recordCheck(db, id, { at: ORIGIN + FIVE, statusCode: 502, responseMs: 20 });
+    recordCheck(db, id, { at: ORIGIN + 2 * FIVE, statusCode: 200, responseMs: 10 });
+    recordCheck(db, id, { at: ORIGIN + 3 * FIVE, error: "timeout" });
+    recordCheck(db, id, { at: ORIGIN + 4 * FIVE, error: "timeout" });
+    recordCheck(db, id, { at: ORIGIN + 5 * FIVE, statusCode: 200, responseMs: 10 });
+
+    const view = getMonitorStatusView(db, id, ORIGIN + 5 * FIVE);
+    expect(view.state).toBe("Up");
+    expect(view.isolatedFailedChecks7d).toBe(3);
+  });
+
+  it("does not count Failed Checks that opened an Incident as isolated", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+
+    recordCheck(db, id, { at: ORIGIN + FIVE, error: "timeout" });
+    recordCheck(db, id, { at: ORIGIN + 2 * FIVE, error: "timeout" });
+    recordCheck(db, id, { at: ORIGIN + 3 * FIVE, error: "timeout" });
+
+    const view = getMonitorStatusView(db, id, ORIGIN + 3 * FIVE);
+    expect(view.state).toBe("Down");
+    expect(view.isolatedFailedChecks7d).toBe(0);
+  });
+
+  it("still counts an Isolated Failed Check after an Incident has recovered", () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      t,
+    ).monitor.id;
+
+    for (let i = 0; i < 3; i += 1) {
+      t += FIVE;
+      recordCheck(db, id, { at: t, error: "timeout" });
+    }
+    for (let i = 0; i < 3; i += 1) {
+      t += FIVE;
+      recordCheck(db, id, { at: t, statusCode: 200, responseMs: 10 });
+    }
+    t += FIVE;
+    recordCheck(db, id, { at: t, statusCode: 502, responseMs: 15 });
+    t += FIVE;
+    recordCheck(db, id, { at: t, statusCode: 200, responseMs: 10 });
+
+    const view = getMonitorStatusView(db, id, t);
+    expect(view.state).toBe("Up");
+    expect(view.isolatedFailedChecks7d).toBe(1);
+  });
+});
+
+describe("overallHighlight", () => {
+  it("names a Down Monitor first", () => {
+    const highlight = overallHighlight([
+      {
+        name: "Docs",
+        state: "Up",
+        slowerThanUsual: false,
+        isolatedFailedChecks7d: 0,
+        lastCheck: { at: ORIGIN, responseMs: 10 },
+      },
+      {
+        name: "API",
+        state: "Down",
+        slowerThanUsual: false,
+        isolatedFailedChecks7d: 0,
+        lastCheck: { at: ORIGIN, responseMs: 10 },
+      },
+    ]);
+    expect(highlight).toEqual({ kind: "down", name: "API" });
+  });
+
+  it("points at the slowest-vs-typical Monitor when all are Up", () => {
+    const highlight = overallHighlight([
+      {
+        name: "Docs",
+        state: "Up",
+        slowerThanUsual: true,
+        isolatedFailedChecks7d: 0,
+        lastCheck: { at: ORIGIN, responseMs: 400 },
+        typicalResponseMs: 100,
+      },
+      {
+        name: "API",
+        state: "Up",
+        slowerThanUsual: false,
+        isolatedFailedChecks7d: 2,
+        lastCheck: { at: ORIGIN + FIVE, responseMs: 20 },
+        typicalResponseMs: 20,
+      },
+    ]);
+    expect(highlight).toEqual({
+      kind: "slower",
+      name: "Docs",
+      responseMs: 400,
+      typicalMs: 100,
+    });
+  });
+
+  it("mentions Isolated Failed Checks when nothing is slower than usual", () => {
+    const highlight = overallHighlight([
+      {
+        name: "Docs",
+        state: "Up",
+        slowerThanUsual: false,
+        isolatedFailedChecks7d: 1,
+        lastCheck: { at: ORIGIN, responseMs: 10 },
+        typicalResponseMs: 10,
+      },
+      {
+        name: "API",
+        state: "Up",
+        slowerThanUsual: false,
+        isolatedFailedChecks7d: 3,
+        lastCheck: { at: ORIGIN + FIVE, responseMs: 12 },
+        typicalResponseMs: 12,
+      },
+    ]);
+    expect(highlight).toEqual({
+      kind: "isolated_fails",
+      name: "API",
+      count: 3,
+    });
+  });
+
+  it("falls back to the most recent Last Check", () => {
+    const highlight = overallHighlight([
+      {
+        name: "Docs",
+        state: "Up",
+        slowerThanUsual: false,
+        isolatedFailedChecks7d: 0,
+        lastCheck: { at: ORIGIN, responseMs: 10 },
+        typicalResponseMs: 10,
+      },
+      {
+        name: "API",
+        state: "Up",
+        slowerThanUsual: false,
+        isolatedFailedChecks7d: 0,
+        lastCheck: { at: ORIGIN + FIVE, responseMs: 12 },
+        typicalResponseMs: 12,
+      },
+    ]);
+    expect(highlight).toEqual({
+      kind: "checked",
+      name: "API",
+      at: ORIGIN + FIVE,
+    });
   });
 });
 

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, lte } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { AppDatabase } from "@/lib/db/client";
 import {
@@ -63,6 +63,14 @@ export type StatusSeriesPoint = {
   responseMs: number;
 };
 
+export type LastCheck = {
+  at: number;
+  success: boolean;
+  statusCode: number | null;
+  responseMs: number | null;
+  error: string | null;
+};
+
 export type StatusMonitorView = {
   id: string;
   name: string;
@@ -74,9 +82,32 @@ export type StatusMonitorView = {
   series: StatusSeriesPoint[];
   incidents: StatusIncident[];
   calendar: CalendarDay[];
+  lastCheck: LastCheck | null;
+  typicalResponseMs: number | null;
+  slowerThanUsual: boolean;
+  isolatedFailedChecks7d: number;
+  upSince: number | null;
 };
 
 export type OverallStatus = "empty" | "up" | "down" | "paused";
+
+export type StatusHighlight =
+  | { kind: "empty" }
+  | { kind: "down"; name: string }
+  | { kind: "paused" }
+  | { kind: "slower"; name: string; responseMs: number; typicalMs: number }
+  | { kind: "isolated_fails"; name: string; count: number }
+  | { kind: "checked"; name: string; at: number }
+  | { kind: "up" };
+
+export type HighlightMonitor = {
+  name: string;
+  state: MonitorState;
+  slowerThanUsual: boolean;
+  isolatedFailedChecks7d: number;
+  lastCheck: { at: number; responseMs: number | null } | null;
+  typicalResponseMs?: number | null;
+};
 
 export type CalendarDayKind = "none" | "up" | "down" | "paused" | "mixed";
 
@@ -98,11 +129,15 @@ type MonitorRow = {
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const SEVEN_DAYS_MS = 7 * DAY_MS;
 const THIRTY_DAYS_MS = 30 * DAY_MS;
 const NINETY_DAYS_MS = 90 * DAY_MS;
 const CALENDAR_DAYS = 90;
 const RECENT_INCIDENT_LIMIT = 10;
 const RECENT_CHECK_LIMIT = 20;
+const TYPICAL_MIN_SAMPLES = 3;
+const SLOWER_RATIO = 1.5;
+const SLOWER_MIN_DELTA_MS = 50;
 
 export function createMonitor(
   db: AppDatabase,
@@ -212,6 +247,55 @@ export function overallStatus(
   if (views.some((view) => view.state === "Down")) return "down";
   if (views.every((view) => view.state === "Paused")) return "paused";
   return "up";
+}
+
+export function overallHighlight(views: HighlightMonitor[]): StatusHighlight {
+  if (views.length === 0) return { kind: "empty" };
+
+  const down = views.find((view) => view.state === "Down");
+  if (down) return { kind: "down", name: down.name };
+  if (views.every((view) => view.state === "Paused")) return { kind: "paused" };
+
+  const slower = views
+    .filter(
+      (view) =>
+        view.slowerThanUsual &&
+        view.lastCheck?.responseMs != null &&
+        view.typicalResponseMs != null,
+    )
+    .sort((a, b) => {
+      const aRatio = a.lastCheck!.responseMs! / a.typicalResponseMs!;
+      const bRatio = b.lastCheck!.responseMs! / b.typicalResponseMs!;
+      return bRatio - aRatio;
+    })[0];
+  if (slower) {
+    return {
+      kind: "slower",
+      name: slower.name,
+      responseMs: slower.lastCheck!.responseMs!,
+      typicalMs: slower.typicalResponseMs!,
+    };
+  }
+
+  const isolated = [...views].sort(
+    (a, b) => b.isolatedFailedChecks7d - a.isolatedFailedChecks7d,
+  )[0];
+  if (isolated && isolated.isolatedFailedChecks7d > 0) {
+    return {
+      kind: "isolated_fails",
+      name: isolated.name,
+      count: isolated.isolatedFailedChecks7d,
+    };
+  }
+
+  const checked = views
+    .filter((view) => view.lastCheck)
+    .sort((a, b) => b.lastCheck!.at - a.lastCheck!.at)[0];
+  if (checked?.lastCheck) {
+    return { kind: "checked", name: checked.name, at: checked.lastCheck.at };
+  }
+
+  return { kind: "up" };
 }
 
 export function calendarFor(
@@ -506,6 +590,8 @@ function buildStatusView(
   now: number,
 ): StatusMonitorView {
   const windowStart = now - NINETY_DAYS_MS;
+  const lastCheck = lastCheckFor(db, monitor.id);
+  const typicalResponseMs = typicalResponseFor(db, monitor.id, now);
   return {
     id: monitor.id,
     name: monitor.name,
@@ -517,7 +603,127 @@ function buildStatusView(
     series: seriesFor(db, monitor.id, windowStart),
     incidents: incidentsFor(db, monitor.id),
     calendar: calendarFor(db, monitor.id, now),
+    lastCheck,
+    typicalResponseMs,
+    slowerThanUsual: isSlowerThanUsual(lastCheck, typicalResponseMs),
+    isolatedFailedChecks7d: isolatedFailedChecksFor(db, monitor.id, now),
+    upSince: upSinceFor(db, monitor),
   };
+}
+
+function lastCheckFor(db: AppDatabase, monitorId: string): LastCheck | null {
+  const row = db
+    .select()
+    .from(checks)
+    .where(eq(checks.monitorId, monitorId))
+    .orderBy(desc(checks.at))
+    .limit(1)
+    .get();
+  if (!row) return null;
+  return {
+    at: toMs(row.at),
+    success: row.success,
+    statusCode: row.statusCode,
+    responseMs: row.responseMs,
+    error: row.error,
+  };
+}
+
+function upSinceFor(db: AppDatabase, monitor: Monitor): number | null {
+  if (monitor.state !== "Up") return null;
+  const open = db
+    .select()
+    .from(stateSegments)
+    .where(
+      and(eq(stateSegments.monitorId, monitor.id), isNull(stateSegments.endedAt)),
+    )
+    .get();
+  if (!open || open.state !== "Up") return null;
+  return toMs(open.startedAt);
+}
+
+function typicalResponseFor(
+  db: AppDatabase,
+  monitorId: string,
+  now: number,
+): number | null {
+  const samples = db
+    .select({ responseMs: checks.responseMs })
+    .from(checks)
+    .where(
+      and(
+        eq(checks.monitorId, monitorId),
+        eq(checks.success, true),
+        gte(checks.at, new Date(now - SEVEN_DAYS_MS)),
+        lte(checks.at, new Date(now)),
+      ),
+    )
+    .all()
+    .map((row) => row.responseMs)
+    .filter((value): value is number => value != null);
+
+  return median(samples);
+}
+
+function isSlowerThanUsual(
+  lastCheck: LastCheck | null,
+  typicalResponseMs: number | null,
+): boolean {
+  if (
+    lastCheck == null ||
+    !lastCheck.success ||
+    lastCheck.responseMs == null ||
+    typicalResponseMs == null
+  ) {
+    return false;
+  }
+  return (
+    lastCheck.responseMs > typicalResponseMs * SLOWER_RATIO &&
+    lastCheck.responseMs - typicalResponseMs >= SLOWER_MIN_DELTA_MS
+  );
+}
+
+function isolatedFailedChecksFor(
+  db: AppDatabase,
+  monitorId: string,
+  now: number,
+): number {
+  const rows = db
+    .select({ success: checks.success })
+    .from(checks)
+    .where(
+      and(
+        eq(checks.monitorId, monitorId),
+        gte(checks.at, new Date(now - SEVEN_DAYS_MS)),
+        lte(checks.at, new Date(now)),
+      ),
+    )
+    .orderBy(asc(checks.at))
+    .all();
+
+  let isolated = 0;
+  let streak = 0;
+  const flush = () => {
+    if (streak > 0 && streak < 3) isolated += streak;
+    streak = 0;
+  };
+  for (const row of rows) {
+    if (row.success) flush();
+    else streak += 1;
+  }
+  flush();
+  return isolated;
+}
+
+function median(values: number[]): number | null {
+  if (values.length < TYPICAL_MIN_SAMPLES) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[mid] ?? null;
+  const left = sorted[mid - 1];
+  const right = sorted[mid];
+  if (left == null || right == null) return null;
+  return Math.round((left + right) / 2);
 }
 
 function availabilityFor(

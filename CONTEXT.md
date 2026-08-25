@@ -48,12 +48,16 @@ _Avoid_: outage, downtime, alert, failure, event
 The state of a running Monitor when no Incident is open.
 _Avoid_: online, healthy, available, green
 
+**Up Since**:
+The start of a Monitor's current Up period. Isolated Failed Checks do not change it. Pause or an Incident ends it; Resume or recovery starts a new one. A Down or Paused Monitor has no Up Since.
+_Avoid_: uptime, current uptime, streak, SLA, uninterrupted
+
 **Down**:
 The state of a running Monitor when an Incident is open. A single Failed Check does not make a Monitor Down.
 _Avoid_: offline, unhealthy, unavailable, red
 
 **Status Page**:
-The single public page a Visitor can open. For each Public Monitor it shows current Up/Down/Paused, a response-time chart, recent Incidents, and 90-day Availability.
+The single public page a Visitor can open. It states whether Public Monitors are all Up, any Down, or all Paused. For each Public Monitor it shows current state, Up Since, Last Check, Typical Response, Isolated Failed Checks, a response-time chart, a 90-day calendar, recent Incidents, and 90-day Availability.
 _Avoid_: public dashboard, status board, public view
 
 **Availability**:
@@ -63,6 +67,18 @@ _Avoid_: uptime, SLA, success rate
 **Notification**:
 An email to the Operator when an Incident opens and when it closes.
 _Avoid_: alert, page, message, channel, webhook
+
+**Last Check**:
+The most recent Check for a Monitor. The Status Page shows when it ran, the HTTP status or error, and response time.
+_Avoid_: latest probe, last ping
+
+**Typical Response**:
+The median response time of Successful Checks over the last seven days. A Last Check well above this is slower than usual; the Monitor is still Up.
+_Avoid_: baseline, p50, average latency, SLA
+
+**Isolated Failed Check**:
+A Failed Check that is not part of an Incident: a streak of one or two consecutive Failed Checks. A third consecutive Failed Check opens an Incident, and those failures are no longer isolated.
+_Avoid_: blip, flake, warning, degraded
 
 **Hourly Summary**:
 Per-hour totals for a Monitor (Successful Checks, Failed Checks, average response time) after raw Checks older than thirty days are discarded.

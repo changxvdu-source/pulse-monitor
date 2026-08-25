@@ -1,3 +1,5 @@
+import type { LastCheck, StatusHighlight } from "@/lib/monitoring/monitoring";
+
 export type Locale = "en" | "zh";
 
 export const DEFAULT_LOCALE: Locale = "en";
@@ -76,6 +78,17 @@ const messages = {
     lastResponseMs: "Last",
     viewMonitor: "Open",
     checkResult: "Result",
+    lastCheck: "Last Check",
+    typicalResponse: "Typical (7d)",
+    nowVsTypical: "Now / typical",
+    isolatedFails7d: "Isolated Failed Checks (7d)",
+    isolatedFailsShort: "Isolated (7d)",
+    slowerThanUsual: "Slower than usual",
+    noLastCheck: "No Checks yet",
+    justNow: "Just now",
+    historyDetails: "Response time, calendar, and Incidents",
+    compareHeading: "Each Public Monitor",
+    upSince: "Up Since",
   },
   zh: {
     appName: "Pulse",
@@ -149,6 +162,17 @@ const messages = {
     lastResponseMs: "最近",
     viewMonitor: "打开",
     checkResult: "结果",
+    lastCheck: "上次 Check",
+    typicalResponse: "往常（7 天）",
+    nowVsTypical: "现在 / 往常",
+    isolatedFails7d: "近 7 天孤立 Failed Check",
+    isolatedFailsShort: "孤立失败（7 天）",
+    slowerThanUsual: "偏慢",
+    noLastCheck: "还没有 Check",
+    justNow: "刚刚",
+    historyDetails: "响应时间、日历和 Incident",
+    compareHeading: "每只公开 Monitor",
+    upSince: "Up Since",
   },
 } as const;
 
@@ -165,4 +189,91 @@ export function getMessages(locale: Locale) {
 export function formatUtc(date: Date, locale: Locale): string {
   const formatted = date.toISOString().replace(/\.\d{3}Z$/, "Z");
   return `${formatted} ${messages[locale].utcLabel}`;
+}
+
+export function formatAge(ms: number, locale: Locale): string {
+  if (ms < 45_000) return messages[locale].justNow;
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  if (minutes < 60) {
+    if (locale === "zh") return `${minutes} 分钟前`;
+    return minutes === 1 ? "1 minute ago" : `${minutes} minutes ago`;
+  }
+  const hours = Math.round(minutes / 60);
+  if (hours < 36) {
+    if (locale === "zh") return `${hours} 小时前`;
+    return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+  }
+  const days = Math.round(hours / 24);
+  if (locale === "zh") return `${days} 天前`;
+  return days === 1 ? "1 day ago" : `${days} days ago`;
+}
+
+export function formatUpSince(
+  upSince: number | null,
+  now: number,
+  locale: Locale,
+): string | null {
+  if (upSince == null) return null;
+  const ms = Math.max(0, now - upSince);
+  if (ms < 45_000) return messages[locale].justNow;
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  if (minutes < 60) {
+    if (locale === "zh") return `${minutes} 分钟`;
+    return minutes === 1 ? "1 minute" : `${minutes} minutes`;
+  }
+  const hours = Math.round(minutes / 60);
+  if (hours < 36) {
+    if (locale === "zh") return `${hours} 小时`;
+    return hours === 1 ? "1 hour" : `${hours} hours`;
+  }
+  const days = Math.round(hours / 24);
+  if (locale === "zh") return `${days} 天`;
+  return days === 1 ? "1 day" : `${days} days`;
+}
+
+export function formatLastCheckLine(
+  last: LastCheck,
+  now: number,
+  locale: Locale,
+): string {
+  const age = formatAge(Math.max(0, now - last.at), locale);
+  const result = last.success
+    ? last.statusCode != null
+      ? `HTTP ${last.statusCode}`
+      : messages[locale].checkSuccessful
+    : (last.error ??
+      (last.statusCode != null
+        ? `HTTP ${last.statusCode}`
+        : messages[locale].checkFailed));
+  const timing = last.responseMs != null ? `${last.responseMs} ms` : null;
+  return [age, result, timing].filter(Boolean).join(" · ");
+}
+
+export function formatHighlight(
+  highlight: StatusHighlight,
+  locale: Locale,
+): string | null {
+  switch (highlight.kind) {
+    case "empty":
+    case "up":
+      return null;
+    case "paused":
+      return messages[locale].overallPaused;
+    case "down":
+      return locale === "zh"
+        ? `${highlight.name} 处于 Down`
+        : `${highlight.name} is Down`;
+    case "slower":
+      return locale === "zh"
+        ? `${highlight.name} 偏慢：${highlight.responseMs} ms，往常 ${highlight.typicalMs} ms`
+        : `${highlight.name} is slower than usual: ${highlight.responseMs} ms vs typical ${highlight.typicalMs} ms`;
+    case "isolated_fails":
+      return locale === "zh"
+        ? `${highlight.name}：近 7 天 ${highlight.count} 次孤立 Failed Check`
+        : `${highlight.name}: ${highlight.count} isolated Failed Checks in 7 days`;
+    case "checked":
+      return locale === "zh"
+        ? `最近一次 Check：${highlight.name} · ${formatUtc(new Date(highlight.at), locale)}`
+        : `Last Check: ${highlight.name} · ${formatUtc(new Date(highlight.at), locale)}`;
+  }
 }

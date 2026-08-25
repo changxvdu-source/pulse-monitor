@@ -3,6 +3,8 @@ export function ResponseChart(props: {
   emptyLabel: string;
   label: string;
   lastLabel: string;
+  typicalMs?: number | null;
+  typicalLabel?: string;
 }) {
   if (props.series.length === 0) {
     return <p className="text-sm text-zinc-500">{props.emptyLabel}</p>;
@@ -14,21 +16,23 @@ export function ResponseChart(props: {
   const padTop = 20;
   const padBottom = 18;
   const values = props.series.map((point) => point.responseMs);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const typical = props.typicalMs ?? null;
+  const min = Math.min(...values, typical ?? values[0]!);
+  const max = Math.max(...values, typical ?? values[0]!);
   const range = Math.max(1, max - min);
   const last = Math.max(1, props.series.length - 1);
+  const yFor = (value: number) =>
+    height -
+    padBottom -
+    ((value - min) / range) * (height - padTop - padBottom);
   const coords = props.series.map((point, index) => {
     const x = padX + (index / last) * (width - 2 * padX);
-    const y =
-      height -
-      padBottom -
-      ((point.responseMs - min) / range) * (height - padTop - padBottom);
-    return { x, y, responseMs: point.responseMs };
+    return { x, y: yFor(point.responseMs), responseMs: point.responseMs };
   });
   const polyline = coords.map((point) => `${point.x},${point.y}`).join(" ");
   const area = `${padX},${height - padBottom} ${polyline} ${width - padX},${height - padBottom}`;
   const latest = coords[coords.length - 1];
+  const typicalY = typical != null ? yFor(typical) : null;
 
   return (
     <div>
@@ -55,6 +59,17 @@ export function ResponseChart(props: {
           strokeWidth="1"
           strokeDasharray="4 4"
         />
+        {typicalY != null ? (
+          <line
+            x1={padX}
+            y1={typicalY}
+            x2={width - padX}
+            y2={typicalY}
+            stroke="#a1a1aa"
+            strokeWidth="1.5"
+            strokeDasharray="6 4"
+          />
+        ) : null}
         <polygon points={area} fill="currentColor" className="opacity-10" />
         <polyline
           fill="none"
@@ -81,6 +96,9 @@ export function ResponseChart(props: {
       </svg>
       <p className="text-xs text-zinc-500">
         {props.lastLabel}: {values[values.length - 1]} ms
+        {typical != null && props.typicalLabel
+          ? ` · ${props.typicalLabel}: ${typical} ms`
+          : null}
       </p>
     </div>
   );
