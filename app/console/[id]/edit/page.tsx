@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { EditMonitorForm } from "@/app/components/monitor-form";
+import { paperCard, paperTextLink } from "@/app/components/paper";
 import { PageShell } from "@/app/components/page-shell";
 import { getCurrentOperator } from "@/lib/auth/current";
 import { getDb } from "@/lib/db";
@@ -37,13 +38,13 @@ export default async function EditMonitorPage({
       actions={
         <Link
           href={`/console/${monitor.id}`}
-          className="text-sm text-zinc-600 underline underline-offset-4 hover:text-zinc-900"
+          className={paperTextLink}
         >
           {t.backToConsole}
         </Link>
       }
     >
-      <section className="rounded-xl border border-zinc-200 bg-white px-5 py-5 shadow-sm">
+      <section className={`${paperCard} px-5 py-5`}>
         <EditMonitorForm
           monitor={monitor}
           labels={{

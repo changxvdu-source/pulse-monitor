@@ -1,3 +1,4 @@
+import { paperCard, paperSecondaryButton } from "@/app/components/paper";
 import {
   availabilityLabel,
   stateBadgeClass,
@@ -10,6 +11,7 @@ import {
   getMessages,
 } from "@/lib/i18n/messages";
 import type { StatusMonitorView } from "@/lib/monitoring/monitoring";
+import Link from "next/link";
 
 type Messages = ReturnType<typeof getMessages>;
 
@@ -18,24 +20,40 @@ export function MonitorCompareTable(props: {
   now: number;
   locale: Locale;
   t: Messages;
+  heading: string;
+  monitorHref: (id: string) => string;
+  operator?: boolean;
 }) {
   const { views, now, locale, t } = props;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+    <section className={paperCard}>
       <h2 className="border-b border-zinc-100 px-5 py-3 text-sm font-medium text-zinc-600">
-        {t.compareHeading}
+        {props.heading}
       </h2>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[48rem] text-left text-sm">
+        <table
+          className={`w-full text-left text-sm ${
+            props.operator ? "min-w-[64rem]" : "min-w-[48rem]"
+          }`}
+        >
           <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
             <tr>
               <th className="px-5 py-2 font-medium">{t.monitorsHeading}</th>
+              {props.operator ? (
+                <th className="px-3 py-2 font-medium">{t.monitorUrl}</th>
+              ) : null}
               <th className="px-3 py-2 font-medium">{t.upSince}</th>
               <th className="px-3 py-2 font-medium">{t.lastCheck}</th>
               <th className="px-3 py-2 font-medium">{t.nowVsTypical}</th>
               <th className="px-3 py-2 font-medium">{t.isolatedFailsShort}</th>
               <th className="px-3 py-2 font-medium">{t.availability90d}</th>
+              {props.operator ? (
+                <>
+                  <th className="px-3 py-2 font-medium">{t.monitorPublic}</th>
+                  <th className="px-3 py-2 font-medium" />
+                </>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
@@ -46,7 +64,7 @@ export function MonitorCompareTable(props: {
               >
                 <td className="px-5 py-3">
                   <a
-                    href={`#monitor-${view.id}`}
+                    href={props.monitorHref(view.id)}
                     className="font-medium hover:text-zinc-700"
                   >
                     {view.name}
@@ -59,6 +77,11 @@ export function MonitorCompareTable(props: {
                     </span>
                   </div>
                 </td>
+                {props.operator ? (
+                  <td className="max-w-[14rem] truncate px-3 py-3 text-zinc-600">
+                    {view.url}
+                  </td>
+                ) : null}
                 <td className="px-3 py-3 tabular-nums text-zinc-800">
                   {formatUpSince(view.upSince, now, locale) ?? "—"}
                 </td>
@@ -76,6 +99,21 @@ export function MonitorCompareTable(props: {
                 <td className="px-3 py-3 tabular-nums text-zinc-700">
                   {availabilityLabel(view.availability90d)}
                 </td>
+                {props.operator ? (
+                  <>
+                    <td className="px-3 py-3 text-zinc-600">
+                      {view.public ? t.monitorPublicYes : t.monitorPublicNo}
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <Link
+                        href={props.monitorHref(view.id)}
+                        className={paperSecondaryButton}
+                      >
+                        {t.viewMonitor}
+                      </Link>
+                    </td>
+                  </>
+                ) : null}
               </tr>
             ))}
           </tbody>

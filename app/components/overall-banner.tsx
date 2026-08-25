@@ -46,7 +46,9 @@ export function OverallBanner(props: {
       <p className="text-sm uppercase tracking-[0.2em] text-white/80">
         {t.statusTitle}
       </p>
-      <p className="mt-2 text-2xl font-semibold">{label}</p>
+      <p className="mt-2 font-serif text-2xl font-semibold tracking-tight">
+        {label}
+      </p>
       {detail ? (
         <p className="mt-3 text-sm text-white/90">{detail}</p>
       ) : null}

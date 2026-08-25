@@ -6,6 +6,7 @@ import {
   updateMonitorAction,
   type MonitorFormState,
 } from "@/app/monitor-actions";
+import { paperInput, paperPrimaryButton } from "@/app/components/paper";
 
 const initialState: MonitorFormState = {};
 
@@ -81,7 +82,7 @@ function MonitorFields(props: {
           name="name"
           required
           defaultValue={props.monitor?.name}
-          className="rounded border border-zinc-300 px-3 py-2"
+          className={paperInput}
         />
       </label>
       <label className="flex flex-col gap-1 text-sm">
@@ -92,7 +93,7 @@ function MonitorFields(props: {
           required
           defaultValue={props.monitor?.url}
           placeholder="https://example.com"
-          className="rounded border border-zinc-300 px-3 py-2"
+          className={paperInput}
         />
       </label>
       <label className="flex items-center gap-2 text-sm">
@@ -111,7 +112,7 @@ function MonitorFields(props: {
       <button
         type="submit"
         disabled={props.pending}
-        className="self-start rounded bg-zinc-900 px-4 py-2 text-white disabled:opacity-60"
+        className={`self-start ${paperPrimaryButton}`}
       >
         {props.submitLabel}
       </button>

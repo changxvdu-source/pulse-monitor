@@ -25,7 +25,7 @@ export function PageShell(props: {
           <p className="text-sm uppercase tracking-[0.2em] text-zinc-500">
             {props.t.appName}
           </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+          <h1 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-zinc-900">
             {props.title}
           </h1>
           {props.subtitle ? (

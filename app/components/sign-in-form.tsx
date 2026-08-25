@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { signIn, type SignInState } from "@/app/actions";
+import { paperInput, paperPrimaryButton } from "@/app/components/paper";
 
 const initialState: SignInState = {};
 
@@ -31,7 +32,7 @@ export function SignInForm(props: {
           type="email"
           required
           autoComplete="username"
-          className="rounded border border-zinc-300 px-3 py-2"
+          className={paperInput}
         />
       </label>
       <label className="flex flex-col gap-1 text-sm">
@@ -41,7 +42,7 @@ export function SignInForm(props: {
           type="password"
           required
           autoComplete="current-password"
-          className="rounded border border-zinc-300 px-3 py-2"
+          className={paperInput}
         />
       </label>
       {error ? (
@@ -52,7 +53,7 @@ export function SignInForm(props: {
       <button
         type="submit"
         disabled={pending}
-        className="rounded bg-zinc-900 px-4 py-2 text-white disabled:opacity-60"
+        className={paperPrimaryButton}
       >
         {props.labels.signIn}
       </button>

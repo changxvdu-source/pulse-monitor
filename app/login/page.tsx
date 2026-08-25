@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { PageShell } from "@/app/components/page-shell";
+import { paperCard, paperTextLink } from "@/app/components/paper";
 import { SignInForm } from "@/app/components/sign-in-form";
 import { getCurrentOperator } from "@/lib/auth/current";
 import { getDictionary } from "@/lib/i18n/server";
@@ -23,13 +24,13 @@ export default async function LoginPage() {
       actions={
         <Link
           href="/"
-          className="text-sm text-zinc-600 underline underline-offset-4 hover:text-zinc-900"
+          className={paperTextLink}
         >
           {t.backToStatus}
         </Link>
       }
     >
-      <section className="rounded-xl border border-zinc-200 bg-white px-6 py-6 shadow-sm">
+      <section className={`${paperCard} px-6 py-6`}>
         <SignInForm
           labels={{
             email: t.email,

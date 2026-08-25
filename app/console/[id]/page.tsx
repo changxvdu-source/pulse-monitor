@@ -6,6 +6,12 @@ import {
   resumeMonitorAction,
 } from "@/app/monitor-actions";
 import { MonitorStatusCard } from "@/app/components/monitor-status-card";
+import {
+  paperCard,
+  paperDangerButton,
+  paperSecondaryButton,
+  paperTextLink,
+} from "@/app/components/paper";
 import { PageShell } from "@/app/components/page-shell";
 import { getCurrentOperator } from "@/lib/auth/current";
 import { getDb } from "@/lib/db";
@@ -47,7 +53,7 @@ export default async function MonitorDetailPage({
       actions={
         <Link
           href="/console"
-          className="text-sm text-zinc-600 underline underline-offset-4 hover:text-zinc-900"
+          className={paperTextLink}
         >
           {t.backToConsole}
         </Link>
@@ -59,7 +65,7 @@ export default async function MonitorDetailPage({
             <input type="hidden" name="id" value={view.id} />
             <button
               type="submit"
-              className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm hover:bg-zinc-50"
+              className={paperSecondaryButton}
             >
               {t.resumeMonitor}
             </button>
@@ -69,7 +75,7 @@ export default async function MonitorDetailPage({
             <input type="hidden" name="id" value={view.id} />
             <button
               type="submit"
-              className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm hover:bg-zinc-50"
+              className={paperSecondaryButton}
             >
               {t.pauseMonitor}
             </button>
@@ -77,7 +83,7 @@ export default async function MonitorDetailPage({
         )}
         <Link
           href={`/console/${view.id}/edit`}
-          className="rounded border border-zinc-300 bg-white px-3 py-1.5 text-sm hover:bg-zinc-50"
+          className={paperSecondaryButton}
         >
           {t.editMonitor}
         </Link>
@@ -85,7 +91,7 @@ export default async function MonitorDetailPage({
           <input type="hidden" name="id" value={view.id} />
           <button
             type="submit"
-            className="rounded border border-red-200 bg-white px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
+            className={paperDangerButton}
           >
             {t.deleteMonitor}
           </button>
@@ -100,7 +106,7 @@ export default async function MonitorDetailPage({
         hideIdentity
       />
 
-      <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+      <section className={paperCard}>
         <h2 className="border-b border-zinc-100 px-6 py-4 text-lg font-medium">
           {t.recentChecks}
         </h2>

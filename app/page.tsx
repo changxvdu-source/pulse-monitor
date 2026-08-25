@@ -1,6 +1,8 @@
+import { historyDetailsOpen } from "@/app/components/history-details-open";
 import { MonitorCompareTable } from "@/app/components/monitor-compare-table";
 import { MonitorStatusCard } from "@/app/components/monitor-status-card";
 import { OverallBanner } from "@/app/components/overall-banner";
+import { paperCard, paperTextLink } from "@/app/components/paper";
 import { PageShell } from "@/app/components/page-shell";
 import { getCurrentOperator } from "@/lib/auth/current";
 import { getDb } from "@/lib/db";
@@ -33,14 +35,14 @@ export default async function StatusPage() {
         operator ? (
           <Link
             href="/console"
-            className="text-sm text-zinc-600 underline underline-offset-4 hover:text-zinc-900"
+            className={paperTextLink}
           >
             {t.consoleTitle}
           </Link>
         ) : (
           <Link
             href="/login"
-            className="text-sm text-zinc-600 underline underline-offset-4 hover:text-zinc-900"
+            className={paperTextLink}
           >
             {t.operatorSignIn}
           </Link>
@@ -60,33 +62,32 @@ export default async function StatusPage() {
             now={nowMs}
             locale={locale}
             t={t}
+            heading={t.compareHeading}
+            monitorHref={(id) => `#monitor-${id}`}
           />
           <div className="flex flex-col gap-3">
-            {views.map((view) => {
-              const open =
-                view.state === "Down" || view.slowerThanUsual;
-              return (
-                <details
-                  key={view.id}
-                  open={open}
-                  className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"
-                >
-                  <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
-                    {view.name} · {t.historyDetails}
-                  </summary>
-                  <div className="border-t border-zinc-100">
-                    <MonitorStatusCard
-                      view={view}
-                      now={nowMs}
-                      locale={locale}
-                      t={t}
-                      hideIdentity
-                      embedded
-                    />
-                  </div>
-                </details>
-              );
-            })}
+            {views.map((view) => (
+              <details
+                key={view.id}
+                open={historyDetailsOpen(view)}
+                className={paperCard}
+              >
+                <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-zinc-700 hover:bg-zinc-50">
+                  {view.name} · {t.historyDetails}
+                </summary>
+                <div className="border-t border-zinc-100">
+                  <MonitorStatusCard
+                    view={view}
+                    now={nowMs}
+                    locale={locale}
+                    t={t}
+                    hideIdentity
+                    embedded
+                    historyOnly
+                  />
+                </div>
+              </details>
+            ))}
           </div>
         </>
       ) : null}
