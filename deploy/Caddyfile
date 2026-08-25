@@ -1,7 +1,3 @@
-{
-	email {$ACME_EMAIL}
-}
-
 {$PULSE_DOMAIN} {
 	encode gzip
 	reverse_proxy web:3000

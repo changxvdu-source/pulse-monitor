@@ -13,5 +13,5 @@ await esbuild.build({
   outfile: "dist/worker.cjs",
   logLevel: "info",
   alias: { "@": root },
-  external: ["better-sqlite3", "bcryptjs"],
+  external: ["better-sqlite3"],
 });
