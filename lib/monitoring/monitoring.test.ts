@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { createTestDb } from "@/lib/auth/test-db";
 import {
+  calendarFor,
   createMonitor,
   deleteMonitor,
   getMonitor,
+  getMonitorStatusView,
   getStatusPage,
   listMonitors,
   listPublicMonitors,
+  listRecentChecks,
   listRunnableMonitors,
+  overallStatus,
   pauseMonitor,
   recordCheck,
   resumeMonitor,
@@ -379,5 +383,113 @@ describe("Availability and rotation", () => {
     expect(view?.series).toEqual(
       expect.arrayContaining([expect.objectContaining({ responseMs: 42 })]),
     );
+  });
+});
+
+const DAY = 24 * 60 * 60 * 1000;
+
+function dayKind(
+  days: { at: number; kind: string }[],
+  at: number,
+): string | undefined {
+  return days.find((day) => day.at === at)?.kind;
+}
+
+describe("getMonitorStatusView", () => {
+  it("returns a Status view for a private Monitor", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Internal", url: "http://127.0.0.1:3000/health", public: false },
+      ORIGIN,
+    ).monitor.id;
+
+    const view = getMonitorStatusView(db, id, ORIGIN);
+    expect(view.name).toBe("Internal");
+    expect(view.state).toBe("Up");
+    expect(getStatusPage(db, ORIGIN)).toHaveLength(0);
+  });
+});
+
+describe("overallStatus", () => {
+  it("summarizes Monitor states for the Status Page banner", () => {
+    expect(overallStatus([])).toBe("empty");
+    expect(overallStatus([{ state: "Up" }, { state: "Up" }])).toBe("up");
+    expect(overallStatus([{ state: "Up" }, { state: "Down" }])).toBe("down");
+    expect(overallStatus([{ state: "Paused" }, { state: "Paused" }])).toBe(
+      "paused",
+    );
+    expect(overallStatus([{ state: "Up" }, { state: "Paused" }])).toBe("up");
+  });
+});
+
+describe("calendarFor", () => {
+  it("marks days before the Monitor exists as none and today as Up", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+
+    const days = calendarFor(db, id, ORIGIN + 12 * 60 * 60 * 1000);
+    expect(days).toHaveLength(90);
+    expect(dayKind(days, ORIGIN)).toBe("up");
+    expect(dayKind(days, ORIGIN - DAY)).toBe("none");
+  });
+
+  it("classifies a UTC day with Up and Down as mixed, and a full Paused day as paused", () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      t,
+    ).monitor.id;
+
+    for (let i = 0; i < 3; i += 1) {
+      t += FIVE;
+      recordCheck(db, id, { at: t, error: "timeout" });
+    }
+
+    const pauseAt = ORIGIN + DAY + 12 * 60 * 60 * 1000;
+    pauseMonitor(db, id, pauseAt);
+    const now = ORIGIN + 2 * DAY + 12 * 60 * 60 * 1000;
+    const days = calendarFor(db, id, now);
+
+    expect(dayKind(days, ORIGIN)).toBe("mixed");
+    expect(dayKind(days, ORIGIN + DAY)).toBe("mixed");
+    expect(dayKind(days, ORIGIN + 2 * DAY)).toBe("paused");
+  });
+});
+
+describe("listRecentChecks", () => {
+  it("returns newest Checks first and honors the limit", () => {
+    const db = createTestDb();
+    const id = createMonitor(
+      db,
+      { name: "Docs", url: "https://example.com/health", public: true },
+      ORIGIN,
+    ).monitor.id;
+
+    recordCheck(db, id, {
+      at: ORIGIN + FIVE,
+      statusCode: 200,
+      responseMs: 10,
+    });
+    recordCheck(db, id, {
+      at: ORIGIN + 2 * FIVE,
+      error: "timeout",
+    });
+
+    const recent = listRecentChecks(db, id, 1);
+    expect(recent).toHaveLength(1);
+    expect(recent[0]?.success).toBe(false);
+    expect(recent[0]?.error).toBe("timeout");
+
+    const all = listRecentChecks(db, id, 10);
+    expect(all).toHaveLength(2);
+    expect(all[1]?.statusCode).toBe(200);
+    expect(all[1]?.responseMs).toBe(10);
   });
 });

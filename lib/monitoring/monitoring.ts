@@ -66,10 +66,23 @@ export type StatusSeriesPoint = {
 export type StatusMonitorView = {
   id: string;
   name: string;
+  url: string;
+  public: boolean;
+  paused: boolean;
   state: MonitorState;
   availability90d: number;
   series: StatusSeriesPoint[];
   incidents: StatusIncident[];
+  calendar: CalendarDay[];
+};
+
+export type OverallStatus = "empty" | "up" | "down" | "paused";
+
+export type CalendarDayKind = "none" | "up" | "down" | "paused" | "mixed";
+
+export type CalendarDay = {
+  at: number;
+  kind: CalendarDayKind;
 };
 
 type MonitorRow = {
@@ -84,9 +97,12 @@ type MonitorRow = {
 };
 
 const HOUR_MS = 60 * 60 * 1000;
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const THIRTY_DAYS_MS = 30 * DAY_MS;
+const NINETY_DAYS_MS = 90 * DAY_MS;
+const CALENDAR_DAYS = 90;
 const RECENT_INCIDENT_LIMIT = 10;
+const RECENT_CHECK_LIMIT = 20;
 
 export function createMonitor(
   db: AppDatabase,
@@ -172,6 +188,82 @@ export function getStatusPage(db: AppDatabase, now: number): StatusMonitorView[]
   return listPublicMonitors(db).map((monitor) =>
     buildStatusView(db, monitor, now),
   );
+}
+
+export function getMonitorStatusView(
+  db: AppDatabase,
+  id: string,
+  now: number,
+): StatusMonitorView {
+  return buildStatusView(db, getMonitor(db, id), now);
+}
+
+export function listMonitorStatusViews(
+  db: AppDatabase,
+  now: number,
+): StatusMonitorView[] {
+  return listMonitors(db).map((monitor) => buildStatusView(db, monitor, now));
+}
+
+export function overallStatus(
+  views: Array<{ state: MonitorState }>,
+): OverallStatus {
+  if (views.length === 0) return "empty";
+  if (views.some((view) => view.state === "Down")) return "down";
+  if (views.every((view) => view.state === "Paused")) return "paused";
+  return "up";
+}
+
+export function calendarFor(
+  db: AppDatabase,
+  monitorId: string,
+  now: number,
+): CalendarDay[] {
+  const today = utcDayStart(now);
+  const first = today - (CALENDAR_DAYS - 1) * DAY_MS;
+  const segments = db
+    .select()
+    .from(stateSegments)
+    .where(eq(stateSegments.monitorId, monitorId))
+    .all();
+
+  const days: CalendarDay[] = [];
+  for (let i = 0; i < CALENDAR_DAYS; i += 1) {
+    const start = first + i * DAY_MS;
+    const end = Math.min(start + DAY_MS, now);
+    const seen = new Set<MonitorState>();
+    for (const segment of segments) {
+      const segStart = toMs(segment.startedAt);
+      const segEnd = segment.endedAt ? toMs(segment.endedAt) : now;
+      const overlap = Math.min(segEnd, end) - Math.max(segStart, start);
+      if (overlap > 0) seen.add(segment.state as MonitorState);
+    }
+    days.push({ at: start, kind: classifyCalendarDay(seen) });
+  }
+  return days;
+}
+
+export function listRecentChecks(
+  db: AppDatabase,
+  id: string,
+  limit = RECENT_CHECK_LIMIT,
+): RecordedCheck[] {
+  loadMonitorRow(db, id);
+  return db
+    .select()
+    .from(checks)
+    .where(eq(checks.monitorId, id))
+    .orderBy(desc(checks.at))
+    .limit(limit)
+    .all()
+    .map((row) => ({
+      id: row.id,
+      at: toMs(row.at),
+      success: row.success,
+      statusCode: row.statusCode,
+      responseMs: row.responseMs,
+      error: row.error,
+    }));
 }
 
 export function recordCheck(
@@ -417,10 +509,14 @@ function buildStatusView(
   return {
     id: monitor.id,
     name: monitor.name,
+    url: monitor.url,
+    public: monitor.public,
+    paused: monitor.paused,
     state: monitor.state,
     availability90d: availabilityFor(db, monitor.id, windowStart, now),
     series: seriesFor(db, monitor.id, windowStart),
     incidents: incidentsFor(db, monitor.id),
+    calendar: calendarFor(db, monitor.id, now),
   };
 }
 
@@ -543,6 +639,19 @@ function openSegment(
       endedAt: null,
     })
     .run();
+}
+
+function utcDayStart(ms: number): number {
+  const date = new Date(ms);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+function classifyCalendarDay(seen: Set<MonitorState>): CalendarDayKind {
+  if (seen.size === 0) return "none";
+  if (seen.size > 1) return "mixed";
+  if (seen.has("Up")) return "up";
+  if (seen.has("Down")) return "down";
+  return "paused";
 }
 
 function toMs(value: Date | number): number {

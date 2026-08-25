@@ -76,7 +76,8 @@ export async function updateMonitorAction(
 
   revalidatePath("/console");
   revalidatePath("/");
-  redirect("/console");
+  revalidatePath(`/console/${id}`);
+  redirect(`/console/${id}`);
 }
 
 export async function deleteMonitorAction(formData: FormData) {
@@ -88,12 +89,13 @@ export async function deleteMonitorAction(formData: FormData) {
     if (error instanceof Error && error.message === "not_found") {
       revalidatePath("/console");
       revalidatePath("/");
-      return;
+      redirect("/console");
     }
     throw error;
   }
   revalidatePath("/console");
   revalidatePath("/");
+  redirect("/console");
 }
 
 export async function pauseMonitorAction(formData: FormData) {
@@ -104,6 +106,7 @@ export async function pauseMonitorAction(formData: FormData) {
   await sendIntents(db, paused.intents);
   revalidatePath("/console");
   revalidatePath("/");
+  revalidatePath(`/console/${id}`);
 }
 
 export async function resumeMonitorAction(formData: FormData) {
@@ -112,4 +115,5 @@ export async function resumeMonitorAction(formData: FormData) {
   resumeMonitor(getDb(), id, Date.now());
   revalidatePath("/console");
   revalidatePath("/");
+  revalidatePath(`/console/${id}`);
 }
