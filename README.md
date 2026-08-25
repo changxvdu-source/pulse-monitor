@@ -11,7 +11,7 @@ It is a portfolio piece run on a $5 Vultr VPS (1 vCPU / 1GB). Visitors never sig
 - **Monitor**: a required display name plus a unique `http` or `https` URL. The Operator may mark it public and may Pause it.
 - **Check**: one HTTP GET that does not follow redirects, with a 10s timeout. 2xx and 3xx on the first response are Successful Checks; anything else is a Failed Check.
 - **Incident**: opens after three consecutive Failed Checks (the Monitor is then Down). It closes after three consecutive Successful Checks, or when the Operator Pauses. A single Failed Check does not make a Monitor Down.
-- **Notification**: an email to the configured Operator address when an Incident opens or closes, including duration. Copy follows the Operator’s last UI language (English by default, Chinese available).
+- **Notification**: an email when an Incident opens or closes, including duration. It goes to the Monitor's Notification address, or to the Operator email if that address is empty. Copy follows the Operator’s last UI language (English by default, Chinese available).
 - **Status Page**: unauthenticated. Only Public Monitors; title is the name, not the URL. Each shows Up / Down / Paused, a response-time chart, recent Incidents (UTC), and 90-day Availability. Paused time is excluded from Availability.
 - **Retention**: raw Checks older than 30 days become Hourly Summaries and are deleted. Pause and Resume do not rewrite history.
 

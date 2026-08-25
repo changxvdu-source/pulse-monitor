@@ -32,6 +32,7 @@ function migrate(sqlite: Database.Database) {
       consecutive_fails INTEGER NOT NULL DEFAULT 0,
       consecutive_successes INTEGER NOT NULL DEFAULT 0,
       open_incident_id TEXT,
+      notification_email TEXT,
       created_at INTEGER NOT NULL
     );
 
@@ -79,6 +80,7 @@ function migrate(sqlite: Database.Database) {
   ensureColumn(sqlite, "monitors", "consecutive_fails", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(sqlite, "monitors", "consecutive_successes", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(sqlite, "monitors", "open_incident_id", "TEXT");
+  ensureColumn(sqlite, "monitors", "notification_email", "TEXT");
   ensureColumn(sqlite, "operators", "locale", "TEXT NOT NULL DEFAULT 'en'");
 }
 

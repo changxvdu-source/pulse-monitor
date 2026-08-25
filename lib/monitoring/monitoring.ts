@@ -18,12 +18,14 @@ export type Monitor = {
   public: boolean;
   paused: boolean;
   state: MonitorState;
+  notificationEmail: string | null;
 };
 
 export type MonitorInput = {
   name: string;
   url: string;
   public: boolean;
+  notificationEmail?: string | null;
 };
 
 export type CheckInput = {
@@ -125,6 +127,7 @@ type MonitorRow = {
   consecutiveFails: number;
   consecutiveSuccesses: number;
   openIncidentId: string | null;
+  notificationEmail: string | null;
 };
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -159,6 +162,7 @@ export function createMonitor(
       consecutiveFails: 0,
       consecutiveSuccesses: 0,
       openIncidentId: null,
+      notificationEmail: normalizeNotificationEmail(input.notificationEmail),
       createdAt: new Date(at),
     })
     .run();
@@ -183,6 +187,7 @@ export function updateMonitor(
       name,
       url,
       public: input.public,
+      notificationEmail: normalizeNotificationEmail(input.notificationEmail),
     })
     .where(eq(monitors.id, existing.id))
     .run();
@@ -881,6 +886,7 @@ function loadMonitorRows(db: AppDatabase): MonitorRow[] {
       consecutiveFails: monitors.consecutiveFails,
       consecutiveSuccesses: monitors.consecutiveSuccesses,
       openIncidentId: monitors.openIncidentId,
+      notificationEmail: monitors.notificationEmail,
     })
     .from(monitors)
     .all();
@@ -897,6 +903,7 @@ function loadMonitorRow(db: AppDatabase, id: string): MonitorRow {
       consecutiveFails: monitors.consecutiveFails,
       consecutiveSuccesses: monitors.consecutiveSuccesses,
       openIncidentId: monitors.openIncidentId,
+      notificationEmail: monitors.notificationEmail,
     })
     .from(monitors)
     .where(eq(monitors.id, id))
@@ -914,7 +921,19 @@ function toMonitor(row: MonitorRow): Monitor {
     public: row.public,
     paused: row.paused,
     state: row.paused ? "Paused" : row.openIncidentId ? "Down" : "Up",
+    notificationEmail: row.notificationEmail,
   };
+}
+
+function normalizeNotificationEmail(
+  value: string | null | undefined,
+): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    throw new Error("invalid_email");
+  }
+  return trimmed;
 }
 
 function requireName(name: string): string {

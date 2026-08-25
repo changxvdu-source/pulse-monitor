@@ -14,7 +14,13 @@ import {
 import { sendIntents } from "@/lib/notify/send";
 
 export type MonitorFormState = {
-  error?: "name_required" | "invalid_url" | "url_not_unique" | "not_found" | "unauthorized";
+  error?:
+    | "name_required"
+    | "invalid_url"
+    | "invalid_email"
+    | "url_not_unique"
+    | "not_found"
+    | "unauthorized";
 };
 
 function readMonitorInput(formData: FormData) {
@@ -22,6 +28,7 @@ function readMonitorInput(formData: FormData) {
     name: String(formData.get("name") ?? ""),
     url: String(formData.get("url") ?? ""),
     public: formData.get("public") === "on",
+    notificationEmail: String(formData.get("notificationEmail") ?? ""),
   };
 }
 
@@ -30,6 +37,7 @@ function mapError(error: unknown): MonitorFormState["error"] {
   if (
     error.message === "name_required" ||
     error.message === "invalid_url" ||
+    error.message === "invalid_email" ||
     error.message === "url_not_unique" ||
     error.message === "not_found"
   ) {

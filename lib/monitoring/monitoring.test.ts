@@ -78,6 +78,57 @@ describe("createMonitor", () => {
     );
     expect(result.monitor.url).toBe("http://127.0.0.1:3000/health");
   });
+
+  it("stores a Notification address on the Monitor", () => {
+    const db = createTestDb();
+    const result = createMonitor(
+      db,
+      {
+        name: "Docs",
+        url: "https://example.com/health",
+        public: true,
+        notificationEmail: "alerts@example.com",
+      },
+      ORIGIN,
+    );
+
+    expect(result.monitor.notificationEmail).toBe("alerts@example.com");
+    expect(getMonitor(db, result.monitor.id).notificationEmail).toBe(
+      "alerts@example.com",
+    );
+  });
+
+  it("rejects a Notification address that is not an email", () => {
+    const db = createTestDb();
+    expect(() =>
+      createMonitor(
+        db,
+        {
+          name: "Docs",
+          url: "https://example.com/health",
+          public: true,
+          notificationEmail: "ops.example.com",
+        },
+        ORIGIN,
+      ),
+    ).toThrow("invalid_email");
+  });
+
+  it("treats a blank Notification address as empty", () => {
+    const db = createTestDb();
+    const result = createMonitor(
+      db,
+      {
+        name: "Docs",
+        url: "https://example.com/health",
+        public: true,
+        notificationEmail: "  ",
+      },
+      ORIGIN,
+    );
+
+    expect(result.monitor.notificationEmail).toBeNull();
+  });
 });
 
 describe("updateMonitor", () => {
@@ -98,6 +149,29 @@ describe("updateMonitor", () => {
     expect(updated.monitor.name).toBe("API");
     expect(updated.monitor.url).toBe("https://example.com/api");
     expect(updated.monitor.public).toBe(false);
+  });
+
+  it("updates the Notification address", () => {
+    const db = createTestDb();
+    const created = createMonitor(
+      db,
+      {
+        name: "Docs",
+        url: "https://example.com/health",
+        public: true,
+        notificationEmail: "alerts@example.com",
+      },
+      ORIGIN,
+    );
+
+    const updated = updateMonitor(db, created.monitor.id, {
+      name: "Docs",
+      url: "https://example.com/health",
+      public: true,
+      notificationEmail: "oncall@example.com",
+    });
+
+    expect(updated.monitor.notificationEmail).toBe("oncall@example.com");
   });
 
   it("rejects changing to another Monitor's URL", () => {

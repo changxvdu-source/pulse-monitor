@@ -34,6 +34,36 @@ describe("deliverIntents", () => {
     expect(mailer.sent[0]?.subject).toBe("[Pulse] Docs is Down");
   });
 
+  it("sends mail to the Monitor Notification address when set", async () => {
+    const db = createTestDb();
+    let t = ORIGIN;
+    const id = createMonitor(
+      db,
+      {
+        name: "Docs",
+        url: "https://example.com/health",
+        public: true,
+        notificationEmail: "alerts@example.com",
+      },
+      t,
+    ).monitor.id;
+
+    let last = null as ReturnType<typeof recordCheck> | null;
+    for (let i = 0; i < 3; i += 1) {
+      t += FIVE;
+      last = recordCheck(db, id, { at: t, error: "timeout" });
+    }
+
+    const mailer = createRecordingMailer();
+    await deliverIntents(db, last!.intents, mailer, {
+      to: "ops@example.com",
+      locale: "en",
+    });
+
+    expect(mailer.sent).toHaveLength(1);
+    expect(mailer.sent[0]?.to).toBe("alerts@example.com");
+  });
+
   it("sends mail when Pause closes an Incident", async () => {
     const db = createTestDb();
     let t = ORIGIN;

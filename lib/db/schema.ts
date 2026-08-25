@@ -17,6 +17,7 @@ export const monitors = sqliteTable("monitors", {
   consecutiveFails: integer("consecutive_fails").notNull().default(0),
   consecutiveSuccesses: integer("consecutive_successes").notNull().default(0),
   openIncidentId: text("open_incident_id"),
+  notificationEmail: text("notification_email"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 

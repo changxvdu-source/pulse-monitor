@@ -65,8 +65,12 @@ The fraction of time a Monitor was Up over the last 90 days. Time spent Paused d
 _Avoid_: uptime, SLA, success rate
 
 **Notification**:
-An email to the Operator when an Incident opens and when it closes.
+An email when an Incident opens and when it closes. It goes to the Monitor's Notification address, or to the Operator email if that address is empty.
 _Avoid_: alert, page, message, channel, webhook
+
+**Notification address**:
+The email address stored on a Monitor for Notifications. Empty means use the Operator email.
+_Avoid_: recipient, notify-to, alert email, CC
 
 **Last Check**:
 The most recent Check for a Monitor. The Status Page shows when it ran, the HTTP status or error, and response time.

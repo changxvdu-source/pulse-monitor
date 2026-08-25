@@ -15,6 +15,8 @@ export async function deliverIntents(
     const incident = loadIncident(db, intent.incidentId);
     if (!incident) continue;
 
+    const to = monitor.notificationEmail || options.to;
+
     if (intent.kind === "incident_opened") {
       const mail = composeNotification(
         {
@@ -24,7 +26,7 @@ export async function deliverIntents(
         },
         options.locale,
       );
-      await mailer.send({ to: options.to, ...mail });
+      await mailer.send({ to, ...mail });
       continue;
     }
 
@@ -39,6 +41,6 @@ export async function deliverIntents(
       },
       options.locale,
     );
-    await mailer.send({ to: options.to, ...mail });
+    await mailer.send({ to, ...mail });
   }
 }

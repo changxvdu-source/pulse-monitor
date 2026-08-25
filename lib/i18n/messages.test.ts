@@ -29,6 +29,7 @@ describe("i18n", () => {
     expect(getMessages("zh").isolatedFails7d).toBe("近 7 天孤立 Failed Check");
     expect(getMessages("zh").slowerThanUsual).toBe("偏慢");
     expect(getMessages("zh").upSince).toBe("Up Since");
+    expect(getMessages("zh").monitorNotificationEmail).toBe("Notification 地址");
   });
 
   it("formats Last Check evidence", () => {

@@ -13,16 +13,27 @@ const initialState: MonitorFormState = {};
 type Labels = {
   name: string;
   url: string;
+  notificationEmail: string;
+  notificationEmailHint: string;
   public: string;
   save: string;
   create: string;
   errors: {
     name_required: string;
     invalid_url: string;
+    invalid_email: string;
     url_not_unique: string;
     not_found: string;
     unauthorized: string;
   };
+};
+
+type EditableMonitor = {
+  id: string;
+  name: string;
+  url: string;
+  public: boolean;
+  notificationEmail: string | null;
 };
 
 export function CreateMonitorForm(props: { labels: Labels }) {
@@ -44,7 +55,7 @@ export function CreateMonitorForm(props: { labels: Labels }) {
 
 export function EditMonitorForm(props: {
   labels: Labels;
-  monitor: { id: string; name: string; url: string; public: boolean };
+  monitor: EditableMonitor;
 }) {
   const [state, action, pending] = useActionState(
     updateMonitorAction,
@@ -69,7 +80,7 @@ function MonitorFields(props: {
   state: MonitorFormState;
   labels: Labels;
   submitLabel: string;
-  monitor?: { id: string; name: string; url: string; public: boolean };
+  monitor?: EditableMonitor;
 }) {
   return (
     <form action={props.action} className="flex flex-col gap-3">
@@ -95,6 +106,17 @@ function MonitorFields(props: {
           placeholder="https://example.com"
           className={paperInput}
         />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span>{props.labels.notificationEmail}</span>
+        <input
+          name="notificationEmail"
+          type="email"
+          defaultValue={props.monitor?.notificationEmail ?? ""}
+          placeholder="ops@example.com"
+          className={paperInput}
+        />
+        <span className="text-zinc-600">{props.labels.notificationEmailHint}</span>
       </label>
       <label className="flex items-center gap-2 text-sm">
         <input

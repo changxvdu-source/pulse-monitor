@@ -28,12 +28,15 @@ export default async function ConsolePage() {
   const formLabels = {
     name: t.monitorName,
     url: t.monitorUrl,
+    notificationEmail: t.monitorNotificationEmail,
+    notificationEmailHint: t.monitorNotificationEmailHint,
     public: t.monitorPublic,
     save: t.saveMonitor,
     create: t.createMonitor,
     errors: {
       name_required: t.errorNameRequired,
       invalid_url: t.errorInvalidUrl,
+      invalid_email: t.errorInvalidEmail,
       url_not_unique: t.errorUrlNotUnique,
       not_found: t.errorNotFound,
       unauthorized: t.errorUnauthorized,
