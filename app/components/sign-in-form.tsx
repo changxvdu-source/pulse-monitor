@@ -11,9 +11,16 @@ export function SignInForm(props: {
     password: string;
     signIn: string;
     invalidCredentials: string;
+    loginThrottled: string;
   };
 }) {
   const [state, action, pending] = useActionState(signIn, initialState);
+  const error =
+    state.error === "throttled"
+      ? props.labels.loginThrottled
+      : state.error
+        ? props.labels.invalidCredentials
+        : null;
 
   return (
     <form action={action} className="flex w-full max-w-sm flex-col gap-4">
@@ -37,9 +44,9 @@ export function SignInForm(props: {
           className="rounded border border-zinc-300 px-3 py-2"
         />
       </label>
-      {state.error ? (
+      {error ? (
         <p className="text-sm text-red-700" role="alert">
-          {props.labels.invalidCredentials}
+          {error}
         </p>
       ) : null}
       <button

@@ -1,13 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { authenticate, setOperatorLocale } from "@/lib/auth/operator";
 import { bootstrapOperator } from "@/lib/auth/bootstrap";
 import { getCurrentOperator, SESSION_COOKIE } from "@/lib/auth/current";
 import { requireAuthEnv } from "@/lib/auth/env";
-import { createSessionToken } from "@/lib/auth/session";
+import {
+  clientIp,
+  isThrottled,
+  recordFailure,
+  recordSuccess,
+} from "@/lib/auth/login-limit";
+import { createSessionToken, SESSION_MAX_AGE_SECONDS } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { LOCALE_COOKIE, isLocale, type Locale } from "@/lib/i18n/messages";
 
@@ -21,12 +27,20 @@ export async function signIn(
 ): Promise<SignInState> {
   await bootstrapOperator();
 
+  const ip = clientIp(await headers());
+  if (isThrottled(ip)) {
+    return { error: "throttled" };
+  }
+
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const operator = await authenticate(getDb(), { email, password });
   if (!operator) {
+    recordFailure(ip);
     return { error: "invalid" };
   }
+
+  recordSuccess(ip);
 
   const { sessionSecret } = requireAuthEnv();
   const token = createSessionToken({
@@ -40,6 +54,7 @@ export async function signIn(
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
+    maxAge: SESSION_MAX_AGE_SECONDS,
   });
 
   redirect("/console");

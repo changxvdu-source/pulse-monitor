@@ -18,9 +18,22 @@ export async function ensureOperator(
   db: AppDatabase,
   input: { email: string; password: string },
 ): Promise<Operator> {
-  const existing = listOperators(db);
-  if (existing.length > 0) {
-    return existing[0]!;
+  const existing = db.select().from(operators).get();
+  if (existing) {
+    const passwordOk = await compare(input.password, existing.passwordHash);
+    const emailChanged = existing.email !== input.email;
+    if (emailChanged || !passwordOk) {
+      db.update(operators)
+        .set({
+          email: input.email,
+          passwordHash: passwordOk
+            ? existing.passwordHash
+            : await hash(input.password, 10),
+        })
+        .where(eq(operators.id, existing.id))
+        .run();
+    }
+    return { id: existing.id, email: input.email };
   }
 
   const passwordHash = await hash(input.password, 10);

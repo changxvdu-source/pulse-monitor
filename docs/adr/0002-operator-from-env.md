@@ -1,6 +1,6 @@
 # The Operator is created from environment variables
 
-There is no registration. On boot, Pulse creates the Operator if missing, using `OPERATOR_EMAIL` and `OPERATOR_PASSWORD`.
+There is no registration. On boot, Pulse creates the Operator if missing, using `OPERATOR_EMAIL` and `OPERATOR_PASSWORD`. If the Operator already exists, Pulse updates that row to match the current env (email and password).
 
 A first-run setup screen was rejected: it is extra UI that only runs once and is awkward under Docker. Inserting a row by hand was rejected: it cannot be demoed or rebuilt cleanly.
 

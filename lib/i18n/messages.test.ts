@@ -15,5 +15,8 @@ describe("i18n", () => {
   it("switches Chinese copy", () => {
     expect(getMessages("zh").signIn).toBe("登录");
     expect(getMessages("zh").overallDown).toBe("有公开 Monitor 处于 Down");
+    expect(getMessages("zh").loginThrottled).toBe(
+      "登录尝试过多，请 15 分钟后再试。",
+    );
   });
 });

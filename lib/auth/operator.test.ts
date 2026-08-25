@@ -18,7 +18,9 @@ describe("ensureOperator", () => {
 
   it("does not create a second Operator when one already exists", async () => {
     const { createTestDb } = await import("./test-db");
-    const { ensureOperator, listOperators } = await import("./operator");
+    const { ensureOperator, listOperators, authenticate } = await import(
+      "./operator"
+    );
     const db = createTestDb();
 
     await ensureOperator(db, {
@@ -31,7 +33,47 @@ describe("ensureOperator", () => {
     });
 
     expect(listOperators(db)).toHaveLength(1);
-    expect(listOperators(db)[0]?.email).toBe("ops@example.com");
+    expect(listOperators(db)[0]?.email).toBe("other@example.com");
+    expect(
+      await authenticate(db, {
+        email: "other@example.com",
+        password: "other-pass",
+      }),
+    ).not.toBeNull();
+    expect(
+      await authenticate(db, {
+        email: "ops@example.com",
+        password: "secret-pass",
+      }),
+    ).toBeNull();
+  });
+
+  it("updates the password from env so the old password stops working", async () => {
+    const { createTestDb } = await import("./test-db");
+    const { ensureOperator, authenticate } = await import("./operator");
+    const db = createTestDb();
+
+    await ensureOperator(db, {
+      email: "ops@example.com",
+      password: "secret-pass",
+    });
+    await ensureOperator(db, {
+      email: "ops@example.com",
+      password: "new-secret-pass",
+    });
+
+    expect(
+      await authenticate(db, {
+        email: "ops@example.com",
+        password: "secret-pass",
+      }),
+    ).toBeNull();
+    expect(
+      await authenticate(db, {
+        email: "ops@example.com",
+        password: "new-secret-pass",
+      }),
+    ).not.toBeNull();
   });
 });
 

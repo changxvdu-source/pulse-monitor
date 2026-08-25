@@ -29,7 +29,7 @@ Visitor ──HTTPS──► Caddy ──► web (Next.js)
                          worker (5-minute Check loop)
 ```
 
-- **web**: Status Page, Operator console, session auth. The Operator is created from `OPERATOR_EMAIL` / `OPERATOR_PASSWORD` on boot if missing.
+- **web**: Status Page, Operator console, session auth. The Operator is created or updated from `OPERATOR_EMAIL` / `OPERATOR_PASSWORD` on boot.
 - **worker**: Checks running Monitors; both processes share one SQLite file and the same `Monitoring` module (Incident thresholds, Pause, uniqueness, Availability, rotation).
 - **Caddy**: TLS termination. GitHub Actions builds and pushes the image; the VPS only `docker compose pull` and restarts. The 1GB box never compiles the app.
 
@@ -70,6 +70,30 @@ docker compose up -d
 ```
 
 Pushing `main` runs tests, publishes the image, and (when `PULSE_DEPLOY=1`) SSHs in to pull and restart.
+
+### Host firewall
+
+Do this on the VPS after you can already log in with an SSH key. Enabling UFW or disabling password login without a working key will lock you out.
+
+```bash
+ufw default deny incoming
+ufw default allow outgoing
+ufw allow OpenSSH
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw enable
+ufw status
+```
+
+Turn off SSH password login (key auth must already work):
+
+```bash
+sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+sudo systemctl reload sshd
+```
+
+If the Vultr control panel has a Firewall group, allow only 22, 80, and 443 there too.
 
 ## Not in this MVP
 

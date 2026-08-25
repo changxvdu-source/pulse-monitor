@@ -36,6 +36,7 @@ export default async function LoginPage() {
             password: t.password,
             signIn: t.signIn,
             invalidCredentials: t.invalidCredentials,
+            loginThrottled: t.loginThrottled,
           }}
         />
       </section>
