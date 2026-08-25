@@ -40,17 +40,36 @@ export async function runCheckCycle(options?: {
   return checked;
 }
 
+/**
+ * Checks are serial within a cycle, so a slow cycle can outlast the interval.
+ * A dropped tick is cheaper than two cycles racing to record the same Check.
+ */
+export function skipWhileRunning(
+  run: () => Promise<void>,
+): () => Promise<void> {
+  let running = false;
+  return async () => {
+    if (running) return;
+    running = true;
+    try {
+      await run();
+    } finally {
+      running = false;
+    }
+  };
+}
+
 export function startWorkerLoop() {
   console.log(`[pulse-worker] starting; interval=${CHECK_INTERVAL_MS}ms`);
 
-  const tick = async () => {
+  const tick = skipWhileRunning(async () => {
     try {
       const count = await runCheckCycle();
       console.log(`[pulse-worker] checked ${count} monitor(s)`);
     } catch (error) {
       console.error("[pulse-worker] cycle failed", error);
     }
-  };
+  });
 
   void tick();
   return setInterval(() => {
